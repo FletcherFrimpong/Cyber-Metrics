@@ -1,4 +1,4 @@
-# SignalFoundry - AI-Powered Cybersecurity Detection Platform
+# Cyber-Metrics - AI-Powered Cybersecurity Detection Platform
 
 SignalFoundry is an advanced cybersecurity detection platform that centralizes detection rules and analytics from multiple security platforms like Microsoft Sentinel, Splunk, and CrowdStrike. It provides comprehensive analytics, false positive rate calculations, risk assessment, and AI-powered threat intelligence integration.
 
@@ -120,3 +120,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🆘 Support
 
 For support and questions, please open an issue in the GitHub repository.
+
