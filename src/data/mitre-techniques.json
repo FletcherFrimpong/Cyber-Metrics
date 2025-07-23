@@ -1,0 +1,195 @@
+[
+  {
+    "id": "T1078",
+    "name": "Valid Accounts",
+    "description": "Adversaries may obtain and abuse credentials of existing accounts as a means of gaining Initial Access, Persistence, Privilege Escalation, or Defense Evasion.",
+    "tactic": "Initial Access",
+    "examples": [
+      "Default accounts",
+      "Domain accounts",
+      "Local accounts",
+      "Cloud accounts"
+    ],
+    "detectionMethods": [
+      "Monitor for unusual account activity",
+      "Review account creation and modification",
+      "Track failed authentication attempts",
+      "Monitor for privilege escalation"
+    ],
+    "mitigationStrategies": [
+      "Use of strong passwords",
+      "Multi-factor authentication",
+      "Account monitoring",
+      "Privilege management"
+    ]
+  },
+  {
+    "id": "T1005",
+    "name": "Data from Local System",
+    "description": "Adversaries may search local system sources, such as file systems and configuration files or local databases, to find files of interest and sensitive data prior to Exfiltration.",
+    "tactic": "Collection",
+    "examples": [
+      "File system enumeration",
+      "Registry queries",
+      "Local database access",
+      "Configuration files"
+    ],
+    "detectionMethods": [
+      "Monitor file system access",
+      "Track registry queries",
+      "Monitor database access patterns",
+      "File integrity monitoring"
+    ],
+    "mitigationStrategies": [
+      "File system permissions",
+      "Registry access controls",
+      "Database access controls",
+      "Data encryption"
+    ]
+  },
+  {
+    "id": "T1041",
+    "name": "Exfiltration Over C2 Channel",
+    "description": "Adversaries may steal data by exfiltrating it over an existing command and control channel. Stolen data is encoded into the normal communications channel using the same protocol as command and control traffic.",
+    "tactic": "Exfiltration",
+    "examples": [
+      "HTTP/HTTPS exfiltration",
+      "DNS exfiltration",
+      "Email exfiltration",
+      "FTP exfiltration"
+    ],
+    "detectionMethods": [
+      "Monitor network traffic patterns",
+      "Analyze data transfer volumes",
+      "Detect unusual protocols",
+      "Monitor for data encoding"
+    ],
+    "mitigationStrategies": [
+      "Network segmentation",
+      "Data loss prevention",
+      "Traffic analysis",
+      "Protocol filtering"
+    ]
+  },
+  {
+    "id": "T1486",
+    "name": "Data Encrypted for Impact",
+    "description": "Adversaries may encrypt data on target systems or on large numbers of systems in a network to interrupt availability to system and network resources. They can attempt to render stored data inaccessible by encrypting files or data on local and remote drives.",
+    "tactic": "Impact",
+    "examples": [
+      "Ransomware encryption",
+      "File encryption",
+      "Database encryption",
+      "Backup encryption"
+    ],
+    "detectionMethods": [
+      "Monitor file system changes",
+      "Detect encryption processes",
+      "Monitor backup access",
+      "File integrity monitoring"
+    ],
+    "mitigationStrategies": [
+      "Regular backups",
+      "File integrity monitoring",
+      "Process monitoring",
+      "Network segmentation"
+    ]
+  },
+  {
+    "id": "T1490",
+    "name": "Inhibit System Recovery",
+    "description": "Adversaries may delete or remove built-in operating system data and turn off services designed to aid in the recovery of a corrupted system to prevent recovery.",
+    "tactic": "Impact",
+    "examples": [
+      "Delete shadow copies",
+      "Disable backup services",
+      "Remove recovery partitions",
+      "Delete restore points"
+    ],
+    "detectionMethods": [
+      "Monitor system recovery tools",
+      "Track backup service status",
+      "Monitor file deletion patterns",
+      "System restore monitoring"
+    ],
+    "mitigationStrategies": [
+      "Offline backups",
+      "Recovery tool protection",
+      "Service monitoring",
+      "File integrity monitoring"
+    ]
+  },
+  {
+    "id": "T1071",
+    "name": "Application Layer Protocol",
+    "description": "Adversaries may communicate using application layer protocols to avoid detection/network filtering by blending in with existing traffic.",
+    "tactic": "Command and Control",
+    "examples": [
+      "HTTP/HTTPS",
+      "DNS",
+      "SMTP",
+      "FTP",
+      "SMB"
+    ],
+    "detectionMethods": [
+      "Network traffic analysis",
+      "Protocol anomaly detection",
+      "Behavioral analysis",
+      "Traffic pattern monitoring"
+    ],
+    "mitigationStrategies": [
+      "Network segmentation",
+      "Protocol filtering",
+      "Traffic analysis",
+      "Intrusion detection"
+    ]
+  },
+  {
+    "id": "T1105",
+    "name": "Ingress Tool Transfer",
+    "description": "Adversaries may transfer tools or other files from an external system into a compromised environment.",
+    "tactic": "Command and Control",
+    "examples": [
+      "Download tools",
+      "Upload files",
+      "File transfer",
+      "Tool deployment"
+    ],
+    "detectionMethods": [
+      "Monitor file downloads",
+      "Track network transfers",
+      "File integrity monitoring",
+      "Process monitoring"
+    ],
+    "mitigationStrategies": [
+      "Network filtering",
+      "File integrity monitoring",
+      "Process monitoring",
+      "Application whitelisting"
+    ]
+  },
+  {
+    "id": "T1190",
+    "name": "Exploit Public-Facing Application",
+    "description": "Adversaries may attempt to take advantage of a weakness in an Internet-facing computer or program using software, data, or commands in order to cause unintended or unanticipated behavior.",
+    "tactic": "Initial Access",
+    "examples": [
+      "SQL injection",
+      "Cross-site scripting",
+      "Buffer overflow",
+      "Authentication bypass"
+    ],
+    "detectionMethods": [
+      "Web application monitoring",
+      "Intrusion detection systems",
+      "Log analysis",
+      "Vulnerability scanning"
+    ],
+    "mitigationStrategies": [
+      "Regular patching",
+      "Input validation",
+      "Web application firewalls",
+      "Security testing"
+    ]
+  }
+]

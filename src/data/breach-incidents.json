@@ -1,0 +1,185 @@
+[
+  {
+    "id": "solarwinds-2020",
+    "name": "SolarWinds Supply Chain Attack",
+    "date": "2020-12-13",
+    "organization": "SolarWinds",
+    "industry": "Technology",
+    "techniques": [
+      "T1078",
+      "T1005",
+      "T1041",
+      "T1071",
+      "T1105"
+    ],
+    "financialImpact": 18000000,
+    "recordsCompromised": 18000,
+    "description": "Supply chain attack affecting thousands of organizations through compromised Orion software updates",
+    "source": "CISA",
+    "url": "https://www.cisa.gov/supply-chain-compromise"
+  },
+  {
+    "id": "colonial-pipeline-2021",
+    "name": "Colonial Pipeline Ransomware",
+    "date": "2021-05-07",
+    "organization": "Colonial Pipeline",
+    "industry": "Energy",
+    "techniques": [
+      "T1486",
+      "T1490",
+      "T1078",
+      "T1005"
+    ],
+    "financialImpact": 4400000,
+    "recordsCompromised": 0,
+    "description": "Ransomware attack causing fuel supply disruption across US East Coast",
+    "source": "FBI",
+    "url": "https://www.fbi.gov/news/press-releases"
+  },
+  {
+    "id": "kaseya-2021",
+    "name": "Kaseya VSA Ransomware Attack",
+    "date": "2021-07-02",
+    "organization": "Kaseya",
+    "industry": "Technology",
+    "techniques": [
+      "T1486",
+      "T1490",
+      "T1078",
+      "T1005",
+      "T1071"
+    ],
+    "financialImpact": 70000000,
+    "recordsCompromised": 1500,
+    "description": "Ransomware attack affecting managed service providers and their customers",
+    "source": "CISA",
+    "url": "https://www.cisa.gov/kaseya-ransomware-attack"
+  },
+  {
+    "id": "log4j-2021",
+    "name": "Log4j Vulnerability Exploitation",
+    "date": "2021-12-09",
+    "organization": "Multiple",
+    "industry": "Technology",
+    "techniques": [
+      "T1190",
+      "T1078",
+      "T1005",
+      "T1041"
+    ],
+    "financialImpact": 10000000,
+    "recordsCompromised": 50000,
+    "description": "Widespread exploitation of Log4j vulnerability affecting millions of systems",
+    "source": "CISA",
+    "url": "https://www.cisa.gov/log4j-vulnerability"
+  },
+  {
+    "id": "microsoft-exchange-2021",
+    "name": "Microsoft Exchange Server Attacks",
+    "date": "2021-03-02",
+    "organization": "Multiple",
+    "industry": "Technology",
+    "techniques": [
+      "T1190",
+      "T1078",
+      "T1005",
+      "T1041",
+      "T1071"
+    ],
+    "financialImpact": 25000000,
+    "recordsCompromised": 100000,
+    "description": "Exploitation of Microsoft Exchange Server vulnerabilities affecting thousands of organizations",
+    "source": "Microsoft",
+    "url": "https://msrc.microsoft.com/update-guide/vulnerability"
+  },
+  {
+    "id": "equifax-2017",
+    "name": "Equifax Data Breach",
+    "date": "2017-07-29",
+    "organization": "Equifax",
+    "industry": "Financial Services",
+    "techniques": [
+      "T1190",
+      "T1005",
+      "T1041",
+      "T1078"
+    ],
+    "financialImpact": 700000000,
+    "recordsCompromised": 147900000,
+    "description": "Massive data breach exposing personal information of millions of consumers",
+    "source": "FTC",
+    "url": "https://www.ftc.gov/equifax-data-breach"
+  },
+  {
+    "id": "target-2013",
+    "name": "Target Data Breach",
+    "date": "2013-11-27",
+    "organization": "Target",
+    "industry": "Retail",
+    "techniques": [
+      "T1190",
+      "T1005",
+      "T1041",
+      "T1078"
+    ],
+    "financialImpact": 162000000,
+    "recordsCompromised": 40000000,
+    "description": "Point-of-sale system compromise leading to massive credit card data theft",
+    "source": "FBI",
+    "url": "https://www.fbi.gov/news/press-releases"
+  },
+  {
+    "id": "anthem-2015",
+    "name": "Anthem Data Breach",
+    "date": "2015-01-29",
+    "organization": "Anthem",
+    "industry": "Healthcare",
+    "techniques": [
+      "T1190",
+      "T1005",
+      "T1041",
+      "T1078"
+    ],
+    "financialImpact": 115000000,
+    "recordsCompromised": 78800000,
+    "description": "Healthcare data breach exposing patient information and social security numbers",
+    "source": "HHS",
+    "url": "https://www.hhs.gov/hipaa"
+  },
+  {
+    "id": "marriott-2018",
+    "name": "Marriott Data Breach",
+    "date": "2018-09-10",
+    "organization": "Marriott",
+    "industry": "Hospitality",
+    "techniques": [
+      "T1190",
+      "T1005",
+      "T1041",
+      "T1078"
+    ],
+    "financialImpact": 126000000,
+    "recordsCompromised": 500000000,
+    "description": "Hotel chain data breach affecting guest reservation systems",
+    "source": "FTC",
+    "url": "https://www.ftc.gov/news-events"
+  },
+  {
+    "id": "jpmorgan-2014",
+    "name": "JPMorgan Chase Data Breach",
+    "date": "2014-06-01",
+    "organization": "JPMorgan Chase",
+    "industry": "Financial Services",
+    "techniques": [
+      "T1190",
+      "T1005",
+      "T1041",
+      "T1078"
+    ],
+    "financialImpact": 100000000,
+    "recordsCompromised": 76000000,
+    "description": "Financial institution breach affecting customer account information",
+    "source": "SEC",
+    "url": "https://www.sec.gov/news"
+  }
+]

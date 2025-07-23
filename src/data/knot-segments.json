@@ -1,0 +1,78 @@
+[
+  {
+    "id": "sentinel-001-filter-0",
+    "ruleId": "sentinel-001",
+    "name": "Filter 1",
+    "type": "filter",
+    "query": "EventID == 4624",
+    "description": "Filters data based on: EventID == 4624",
+    "position": 0,
+    "dependencies": [],
+    "complexity": "low"
+  },
+  {
+    "id": "sentinel-001-filter-1",
+    "ruleId": "sentinel-001",
+    "name": "Filter 2",
+    "type": "filter",
+    "query": "AccountType == \"User\"",
+    "description": "Filters data based on: AccountType == \"User\"",
+    "position": 1,
+    "dependencies": [
+      "sentinel-001-filter-0"
+    ],
+    "complexity": "low"
+  },
+  {
+    "id": "sentinel-001-filter-2",
+    "ruleId": "sentinel-001",
+    "name": "Filter 3",
+    "type": "filter",
+    "query": "LogonType in (2, 3, 7, 8, 9, 10, 11, 12, 13)",
+    "description": "Filters data based on: LogonType in (2, 3, 7, 8, 9, 10, 11, 12, 13)",
+    "position": 2,
+    "dependencies": [
+      "sentinel-001-filter-1"
+    ],
+    "complexity": "low"
+  },
+  {
+    "id": "sentinel-001-filter-3",
+    "ruleId": "sentinel-001",
+    "name": "Filter 4",
+    "type": "filter",
+    "query": "TimeGenerated > ago(1h)",
+    "description": "Filters data based on: TimeGenerated > ago(1h)",
+    "position": 3,
+    "dependencies": [
+      "sentinel-001-filter-2"
+    ],
+    "complexity": "low"
+  },
+  {
+    "id": "sentinel-001-agg-4",
+    "ruleId": "sentinel-001",
+    "name": "Aggregation 5",
+    "type": "aggregation",
+    "query": "count() by AccountName, Computer",
+    "description": "Aggregates data: count() by AccountName, Computer",
+    "position": 4,
+    "dependencies": [
+      "sentinel-001-filter-3"
+    ],
+    "complexity": "low"
+  },
+  {
+    "id": "sentinel-001-filter-5",
+    "ruleId": "sentinel-001",
+    "name": "Filter 6",
+    "type": "filter",
+    "query": "count_ > 5",
+    "description": "Filters data based on: count_ > 5",
+    "position": 5,
+    "dependencies": [
+      "sentinel-001-agg-4"
+    ],
+    "complexity": "low"
+  }
+]

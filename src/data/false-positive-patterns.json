@@ -1,0 +1,70 @@
+[
+  {
+    "patternId": "sentinel-001-filter-0-pattern-1",
+    "knotId": "sentinel-001-filter-0",
+    "pattern": "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 | Source IP: 192.168.1.100 | Event Type: login",
+    "frequency": 15,
+    "impact": "medium",
+    "examples": [
+      {
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "source_ip": "192.168.1.100",
+        "event_type": "login",
+        "timestamp": "2024-01-15T10:30:00Z"
+      }
+    ],
+    "mitigation": "Add user-agent whitelist or more specific filtering",
+    "lastSeen": "2024-01-15T10:30:00Z"
+  },
+  {
+    "patternId": "sentinel-001-filter-1-pattern-1",
+    "knotId": "sentinel-001-filter-1",
+    "pattern": "User-Agent: Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0) | Source IP: 10.0.0.50 | Event Type: access_denied",
+    "frequency": 8,
+    "impact": "low",
+    "examples": [
+      {
+        "user_agent": "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0)",
+        "source_ip": "10.0.0.50",
+        "event_type": "access_denied",
+        "timestamp": "2024-01-14T15:45:00Z"
+      }
+    ],
+    "mitigation": "Implement IP-based filtering or geolocation restrictions",
+    "lastSeen": "2024-01-14T15:45:00Z"
+  },
+  {
+    "patternId": "sentinel-002-filter-0-pattern-1",
+    "knotId": "sentinel-002-filter-0",
+    "pattern": "User-Agent: curl/7.68.0 | Source IP: 172.16.0.25 | Event Type: logout",
+    "frequency": 22,
+    "impact": "high",
+    "examples": [
+      {
+        "user_agent": "curl/7.68.0",
+        "source_ip": "172.16.0.25",
+        "event_type": "logout",
+        "timestamp": "2024-01-15T09:15:00Z"
+      }
+    ],
+    "mitigation": "Add user-agent whitelist or more specific filtering",
+    "lastSeen": "2024-01-15T09:15:00Z"
+  },
+  {
+    "patternId": "sentinel-002-threshold-0-pattern-1",
+    "knotId": "sentinel-002-threshold-0",
+    "pattern": "User-Agent: Python-urllib/3.8 | Source IP: 192.168.0.75 | Event Type: login",
+    "frequency": 12,
+    "impact": "medium",
+    "examples": [
+      {
+        "user_agent": "Python-urllib/3.8",
+        "source_ip": "192.168.0.75",
+        "event_type": "login",
+        "timestamp": "2024-01-13T14:20:00Z"
+      }
+    ],
+    "mitigation": "Refine event type conditions to be more specific",
+    "lastSeen": "2024-01-13T14:20:00Z"
+  }
+] 

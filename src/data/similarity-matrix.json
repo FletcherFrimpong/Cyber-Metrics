@@ -1,0 +1,232 @@
+[
+  {
+    "ruleId": "healthcare-hipaa-breach-001",
+    "similarities": {
+      "healthcare-hipaa-breach-001": 1,
+      "financial-payment-card-002": 0.9320030362496295,
+      "energy-scada-attack-003": 0.8739115077816291,
+      "manufacturing-espionage-004": 0.9818382830122636,
+      "retail-pos-breach-005": 0.9209092687458089,
+      "education-student-data-006": 0.9022046495764865,
+      "government-classified-007": 0.9381698773607539,
+      "hospitality-loyalty-008": 0.895901064835698,
+      "professional-client-data-009": 0.951953071924473,
+      "ransomware-encryption-010": 0.9406177023210358
+    },
+    "averageSimilarity": 0.933750846180778,
+    "mostSimilar": [
+      "manufacturing-espionage-004",
+      "professional-client-data-009",
+      "ransomware-encryption-010",
+      "government-classified-007",
+      "financial-payment-card-002"
+    ]
+  },
+  {
+    "ruleId": "financial-payment-card-002",
+    "similarities": {
+      "healthcare-hipaa-breach-001": 0.9320030362496295,
+      "financial-payment-card-002": 1,
+      "energy-scada-attack-003": 0.8422872967040328,
+      "manufacturing-espionage-004": 0.9451562196630321,
+      "retail-pos-breach-005": 0.9300092915669215,
+      "education-student-data-006": 0.968174356993296,
+      "government-classified-007": 0.9624133193690643,
+      "hospitality-loyalty-008": 0.9665225149077116,
+      "professional-client-data-009": 0.9604437173444459,
+      "ransomware-encryption-010": 0.8344912971373404
+    },
+    "averageSimilarity": 0.9341501049935473,
+    "mostSimilar": [
+      "education-student-data-006",
+      "hospitality-loyalty-008",
+      "government-classified-007",
+      "professional-client-data-009",
+      "manufacturing-espionage-004"
+    ]
+  },
+  {
+    "ruleId": "energy-scada-attack-003",
+    "similarities": {
+      "healthcare-hipaa-breach-001": 0.8739115077816291,
+      "financial-payment-card-002": 0.8422872967040328,
+      "energy-scada-attack-003": 1,
+      "manufacturing-espionage-004": 0.9445300063741244,
+      "retail-pos-breach-005": 0.9567366039091396,
+      "education-student-data-006": 0.9314423772523455,
+      "government-classified-007": 0.9454393715939909,
+      "hospitality-loyalty-008": 0.9289520354082467,
+      "professional-client-data-009": 0.9458772265429934,
+      "ransomware-encryption-010": 0.7949990979352193
+    },
+    "averageSimilarity": 0.9164175523501722,
+    "mostSimilar": [
+      "retail-pos-breach-005",
+      "professional-client-data-009",
+      "government-classified-007",
+      "manufacturing-espionage-004",
+      "education-student-data-006"
+    ]
+  },
+  {
+    "ruleId": "manufacturing-espionage-004",
+    "similarities": {
+      "healthcare-hipaa-breach-001": 0.9818382830122636,
+      "financial-payment-card-002": 0.9451562196630321,
+      "energy-scada-attack-003": 0.9445300063741244,
+      "manufacturing-espionage-004": 1,
+      "retail-pos-breach-005": 0.9620487015348483,
+      "education-student-data-006": 0.9530991662598091,
+      "government-classified-007": 0.9751662262026776,
+      "hospitality-loyalty-008": 0.9483654162292571,
+      "professional-client-data-009": 0.9892460586176621,
+      "ransomware-encryption-010": 0.8968982013287556
+    },
+    "averageSimilarity": 0.9596348279222429,
+    "mostSimilar": [
+      "professional-client-data-009",
+      "healthcare-hipaa-breach-001",
+      "government-classified-007",
+      "retail-pos-breach-005",
+      "education-student-data-006"
+    ]
+  },
+  {
+    "ruleId": "retail-pos-breach-005",
+    "similarities": {
+      "healthcare-hipaa-breach-001": 0.9209092687458089,
+      "financial-payment-card-002": 0.9300092915669215,
+      "energy-scada-attack-003": 0.9567366039091396,
+      "manufacturing-espionage-004": 0.9620487015348483,
+      "retail-pos-breach-005": 1,
+      "education-student-data-006": 0.980726025100675,
+      "government-classified-007": 0.9916861520171175,
+      "hospitality-loyalty-008": 0.9793787282393414,
+      "professional-client-data-009": 0.9567960329009974,
+      "ransomware-encryption-010": 0.8868827672793912
+    },
+    "averageSimilarity": 0.9565173571294242,
+    "mostSimilar": [
+      "government-classified-007",
+      "education-student-data-006",
+      "hospitality-loyalty-008",
+      "manufacturing-espionage-004",
+      "professional-client-data-009"
+    ]
+  },
+  {
+    "ruleId": "education-student-data-006",
+    "similarities": {
+      "healthcare-hipaa-breach-001": 0.9022046495764865,
+      "financial-payment-card-002": 0.968174356993296,
+      "energy-scada-attack-003": 0.9314423772523455,
+      "manufacturing-espionage-004": 0.9530991662598091,
+      "retail-pos-breach-005": 0.980726025100675,
+      "education-student-data-006": 1,
+      "government-classified-007": 0.9916357038153653,
+      "hospitality-loyalty-008": 0.999823010819915,
+      "professional-client-data-009": 0.9728077000218486,
+      "ransomware-encryption-010": 0.8184736681397525
+    },
+    "averageSimilarity": 0.9518386657979493,
+    "mostSimilar": [
+      "hospitality-loyalty-008",
+      "government-classified-007",
+      "retail-pos-breach-005",
+      "professional-client-data-009",
+      "financial-payment-card-002"
+    ]
+  },
+  {
+    "ruleId": "government-classified-007",
+    "similarities": {
+      "healthcare-hipaa-breach-001": 0.9381698773607539,
+      "financial-payment-card-002": 0.9624133193690643,
+      "energy-scada-attack-003": 0.9454393715939909,
+      "manufacturing-espionage-004": 0.9751662262026776,
+      "retail-pos-breach-005": 0.9916861520171175,
+      "education-student-data-006": 0.9916357038153653,
+      "government-classified-007": 1,
+      "hospitality-loyalty-008": 0.9904784961816014,
+      "professional-client-data-009": 0.9792223635185393,
+      "ransomware-encryption-010": 0.8746187577594304
+    },
+    "averageSimilarity": 0.9648830267818541,
+    "mostSimilar": [
+      "retail-pos-breach-005",
+      "education-student-data-006",
+      "hospitality-loyalty-008",
+      "professional-client-data-009",
+      "manufacturing-espionage-004"
+    ]
+  },
+  {
+    "ruleId": "hospitality-loyalty-008",
+    "similarities": {
+      "healthcare-hipaa-breach-001": 0.895901064835698,
+      "financial-payment-card-002": 0.9665225149077116,
+      "energy-scada-attack-003": 0.9289520354082467,
+      "manufacturing-espionage-004": 0.9483654162292571,
+      "retail-pos-breach-005": 0.9793787282393414,
+      "education-student-data-006": 0.999823010819915,
+      "government-classified-007": 0.9904784961816014,
+      "hospitality-loyalty-008": 1,
+      "professional-client-data-009": 0.9695910934307322,
+      "ransomware-encryption-010": 0.8128077986341791
+    },
+    "averageSimilarity": 0.9491820158686682,
+    "mostSimilar": [
+      "education-student-data-006",
+      "government-classified-007",
+      "retail-pos-breach-005",
+      "professional-client-data-009",
+      "financial-payment-card-002"
+    ]
+  },
+  {
+    "ruleId": "professional-client-data-009",
+    "similarities": {
+      "healthcare-hipaa-breach-001": 0.951953071924473,
+      "financial-payment-card-002": 0.9604437173444459,
+      "energy-scada-attack-003": 0.9458772265429934,
+      "manufacturing-espionage-004": 0.9892460586176621,
+      "retail-pos-breach-005": 0.9567960329009974,
+      "education-student-data-006": 0.9728077000218486,
+      "government-classified-007": 0.9792223635185393,
+      "hospitality-loyalty-008": 0.9695910934307322,
+      "professional-client-data-009": 1,
+      "ransomware-encryption-010": 0.832768176465801
+    },
+    "averageSimilarity": 0.9558705440767493,
+    "mostSimilar": [
+      "manufacturing-espionage-004",
+      "government-classified-007",
+      "education-student-data-006",
+      "hospitality-loyalty-008",
+      "financial-payment-card-002"
+    ]
+  },
+  {
+    "ruleId": "ransomware-encryption-010",
+    "similarities": {
+      "healthcare-hipaa-breach-001": 0.9406177023210358,
+      "financial-payment-card-002": 0.8344912971373404,
+      "energy-scada-attack-003": 0.7949990979352193,
+      "manufacturing-espionage-004": 0.8968982013287556,
+      "retail-pos-breach-005": 0.8868827672793912,
+      "education-student-data-006": 0.8184736681397525,
+      "government-classified-007": 0.8746187577594304,
+      "hospitality-loyalty-008": 0.8128077986341791,
+      "professional-client-data-009": 0.832768176465801,
+      "ransomware-encryption-010": 1
+    },
+    "averageSimilarity": 0.8692557467000906,
+    "mostSimilar": [
+      "healthcare-hipaa-breach-001",
+      "manufacturing-espionage-004",
+      "retail-pos-breach-005",
+      "government-classified-007",
+      "financial-payment-card-002"
+    ]
+  }
+]
