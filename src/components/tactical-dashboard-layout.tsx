@@ -9,7 +9,6 @@ import DashboardPage from "@/app/dashboard/page"
 import AttackCostsPage from "@/app/attack-costs/page"
 import AlertsPage from "@/app/alerts/page"
 import ExecutiveReportsPage from "@/app/executive-reports/page"
-import ThreatIntelPage from "@/app/threat-intel/page"
 
 export function TacticalDashboardLayout() {
   const [activeSection, setActiveSection] = useState("dashboard")
@@ -20,7 +19,6 @@ export function TacticalDashboardLayout() {
     { id: "attack-costs", icon: Target, label: "ATTACK COSTS" },
     { id: "alerts", icon: Bell, label: "REAL-TIME ALERTS" },
     { id: "executive-reports", icon: FileText, label: "EXECUTIVE REPORTS" },
-    { id: "threat-intel", icon: Database, label: "THREAT INTEL" },
     { id: "systems", icon: Settings, label: "SYSTEMS" },
   ]
 
@@ -35,8 +33,6 @@ export function TacticalDashboardLayout() {
         return <AlertsPage />
       case "executive-reports":
         return <ExecutiveReportsPage />
-      case "threat-intel":
-        return <ThreatIntelPage />
       case "systems":
         return <SystemsPage />
       default:

@@ -1,12 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronRight, Monitor, Settings, Target, RefreshCw, FileText, Database, AlertTriangle, DollarSign } from "lucide-react"
+import { ChevronRight, Monitor, Settings, Target, RefreshCw, FileText, AlertTriangle, DollarSign } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import ThreatIntelligenceView from "@/components/threat-intelligence-view"
 import CostSavingsView from "@/components/cost-savings-view"
 
 export default function HomePage() {
@@ -17,15 +16,10 @@ export default function HomePage() {
     { id: "dashboard", icon: Monitor, label: "DASHBOARD" },
     { id: "attack-costs", icon: Target, label: "ATTACK COSTS" },
     { id: "executive-reports", icon: FileText, label: "EXECUTIVE REPORTS" },
-    { id: "threat-intel", icon: Database, label: "THREAT INTEL" },
     { id: "systems", icon: Settings, label: "SYSTEMS" },
   ]
 
   const renderDashboardContent = () => {
-    if (activeSection === "threat-intel") {
-      return <ThreatIntelligenceView />
-    }
-
     if (activeSection === "attack-costs") {
       return <CostSavingsView />
     }
@@ -209,7 +203,7 @@ export default function HomePage() {
           <Card className="bg-neutral-900 border-neutral-700 hover:border-neutral-600 transition-all duration-300">
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
-                <Database className="w-5 h-5 text-orange-400" />
+                <Target className="w-5 h-5 text-orange-400" />
                 Threat Intelligence Overview
               </CardTitle>
             </CardHeader>
@@ -244,7 +238,7 @@ export default function HomePage() {
               </div>
               <div className="pt-2 border-t border-neutral-700">
                 <p className="text-xs text-neutral-500 text-center">
-                  Click "THREAT INTEL" in sidebar for detailed analysis
+                  For detailed analysis, see executive reports or cost savings breakdown.
                 </p>
               </div>
             </CardContent>
