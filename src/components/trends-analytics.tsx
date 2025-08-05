@@ -332,10 +332,6 @@ export default function TrendsAnalytics() {
             <div className="text-2xl font-bold text-white">
               {timeView === "quarterly" ? selectedQuarter : timeData.currentYear}
             </div>
-            <div className="text-xs text-neutral-400">KRI Score</div>
-            <div className="text-lg font-bold text-orange-400">
-              {Math.round(Object.values(data).reduce((sum: any, val: any) => sum + val, 0) / Object.keys(data).length)}%
-            </div>
           </div>
         </div>
 
