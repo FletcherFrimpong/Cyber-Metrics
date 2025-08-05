@@ -550,41 +550,7 @@ export default function TrendsAnalytics() {
               </div>
             )}
             
-            {/* Cost Savings Analysis */}
-            <div className="pt-6 border-t border-neutral-700">
-              <div className="max-w-md">
-                <h5 className="text-sm font-medium text-neutral-300 mb-4 flex items-center gap-2">
-                  <DollarSign className="w-4 h-4" />
-                  Cost Savings Analysis
-                </h5>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-neutral-800 rounded border border-neutral-700">
-                    <span className="text-sm text-neutral-400">Total saved:</span>
-                    <span className="text-green-400 font-medium">
-                      ${(timeView === "quarterly"
-                        ? timeData.quarterlyData.reduce((sum, q) => sum + q.costSaved, 0)
-                        : timeData.yearlyData.reduce((sum, y) => sum + y.costSaved, 0)
-                      / 1000000).toFixed(0)}M
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-neutral-800 rounded border border-neutral-700">
-                    <span className="text-sm text-neutral-400">Average per period:</span>
-                    <span className="text-green-400 font-medium">
-                      ${(timeView === "quarterly"
-                        ? timeData.quarterlyData.reduce((sum, q) => sum + q.costSaved, 0) / timeData.quarterlyData.length
-                        : timeData.yearlyData.reduce((sum, y) => sum + y.costSaved, 0) / timeData.yearlyData.length
-                      / 1000000).toFixed(1)}M
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-neutral-800 rounded border border-neutral-700">
-                    <span className="text-sm text-neutral-400">ROI trend:</span>
-                    <span className={`font-medium ${aggregatedData.trend.costChange >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      {aggregatedData.trend.costChange >= 0 ? "↗ Increasing" : "↘ Decreasing"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
+
           </div>
         </CardContent>
       </Card>
