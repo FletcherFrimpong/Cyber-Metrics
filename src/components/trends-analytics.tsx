@@ -195,6 +195,169 @@ export default function TrendsAnalytics() {
 
   const aggregatedData = getAggregatedData();
 
+  // Key Risk Indicators (KRI) data based on time period
+  const getKRIData = () => {
+    const selectedData = timeView === "quarterly" 
+      ? timeData.quarterlyData.find(q => q.quarter === selectedQuarter)
+      : timeData.yearlyData.find(y => y.year === timeData.currentYear);
+
+    if (!selectedData) return null;
+
+    const totalAttacks = selectedData.attacks;
+    const totalCostSaved = selectedData.costSaved;
+    const categories = selectedData.categories;
+
+    // Calculate KRI metrics based on the selected time period
+    const kriMetrics = {
+      threatVolume: Math.min(100, (totalAttacks / 300) * 100), // Normalized to 100
+      costEfficiency: Math.min(100, (totalCostSaved / 50000000) * 100), // Normalized to 100
+      detectionAccuracy: 97.8, // Based on overall accuracy
+      responseTime: 85, // Response time efficiency (1.2s avg)
+      coverageGap: 15, // Coverage gap percentage
+      riskExposure: Math.min(100, (totalAttacks / 250) * 100), // Risk exposure level
+      complianceScore: 92, // Compliance adherence
+      incidentSeverity: Math.min(100, (totalAttacks / 200) * 100) // Incident severity index
+    };
+
+    return kriMetrics;
+  };
+
+  const kriData = getKRIData();
+
+  // Radar chart component
+  const RadarChart = ({ data }: { data: any }) => {
+    if (!data) return null;
+
+    const metrics = [
+      { name: "Threat Volume", value: data.threatVolume, color: "from-red-500 to-red-600" },
+      { name: "Cost Efficiency", value: data.costEfficiency, color: "from-green-500 to-green-600" },
+      { name: "Detection Accuracy", value: data.detectionAccuracy, color: "from-blue-500 to-blue-600" },
+      { name: "Response Time", value: data.responseTime, color: "from-purple-500 to-purple-600" },
+      { name: "Coverage Gap", value: data.coverageGap, color: "from-orange-500 to-orange-600" },
+      { name: "Risk Exposure", value: data.riskExposure, color: "from-red-400 to-red-500" },
+      { name: "Compliance Score", value: data.complianceScore, color: "from-emerald-500 to-emerald-600" },
+      { name: "Incident Severity", value: data.incidentSeverity, color: "from-amber-500 to-amber-600" }
+    ];
+
+    const radius = 120;
+    const centerX = 150;
+    const centerY = 150;
+
+    return (
+      <div className="relative w-full h-80 flex items-center justify-center">
+        <svg width="300" height="300" className="transform -rotate-90">
+          {/* Background circles */}
+          {[20, 40, 60, 80, 100].map((level) => (
+            <circle
+              key={level}
+              cx={centerX}
+              cy={centerY}
+              r={(radius * level) / 100}
+              fill="none"
+              stroke="rgba(75, 85, 99, 0.2)"
+              strokeWidth="1"
+            />
+          ))}
+
+          {/* Radial lines */}
+          {metrics.map((metric, index) => {
+            const angle = (index * 360) / metrics.length;
+            const radian = (angle * Math.PI) / 180;
+            const x = centerX + radius * Math.cos(radian);
+            const y = centerY + radius * Math.sin(radian);
+            
+            return (
+              <line
+                key={index}
+                x1={centerX}
+                y1={centerY}
+                x2={x}
+                y2={y}
+                stroke="rgba(75, 85, 99, 0.3)"
+                strokeWidth="1"
+              />
+            );
+          })}
+
+          {/* Data polygon */}
+          <polygon
+            points={metrics.map((metric, index) => {
+              const angle = (index * 360) / metrics.length;
+              const radian = (angle * Math.PI) / 180;
+              const valueRadius = (radius * metric.value) / 100;
+              const x = centerX + valueRadius * Math.cos(radian);
+              const y = centerY + valueRadius * Math.sin(radian);
+              return `${x},${y}`;
+            }).join(" ")}
+            fill="url(#radarGradient)"
+            fillOpacity="0.3"
+            stroke="url(#radarGradient)"
+            strokeWidth="2"
+          />
+
+          {/* Data points */}
+          {metrics.map((metric, index) => {
+            const angle = (index * 360) / metrics.length;
+            const radian = (angle * Math.PI) / 180;
+            const valueRadius = (radius * metric.value) / 100;
+            const x = centerX + valueRadius * Math.cos(radian);
+            const y = centerY + valueRadius * Math.sin(radian);
+            
+            return (
+              <circle
+                key={index}
+                cx={x}
+                cy={y}
+                r="4"
+                fill={`hsl(${index * 45}, 70%, 60%)`}
+                stroke="white"
+                strokeWidth="2"
+              />
+            );
+          })}
+
+          {/* Gradient definition */}
+          <defs>
+            <linearGradient id="radarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.8" />
+              <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.6" />
+              <stop offset="100%" stopColor="#ef4444" stopOpacity="0.8" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        {/* Center indicator */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-white">
+              {timeView === "quarterly" ? selectedQuarter : timeData.currentYear}
+            </div>
+            <div className="text-xs text-neutral-400">KRI Score</div>
+            <div className="text-lg font-bold text-orange-400">
+              {Math.round(Object.values(data).reduce((sum: any, val: any) => sum + val, 0) / Object.keys(data).length)}%
+            </div>
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div className="absolute -bottom-8 left-0 right-0">
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {metrics.map((metric, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: `hsl(${index * 45}, 70%, 60%)` }}
+                ></div>
+                <span className="text-neutral-300">{metric.name}</span>
+                <span className="text-white font-medium">{Math.round(metric.value)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 space-y-6 max-h-screen overflow-y-auto">
       {/* Header */}
@@ -464,6 +627,117 @@ export default function TrendsAnalytics() {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Key Risk Indicators Radar Chart */}
+      <Card className="bg-neutral-900 border-neutral-700">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-white text-lg">Key Risk Indicators (KRI) Radar Analysis</CardTitle>
+          <p className="text-sm text-neutral-400">
+            Multi-dimensional risk assessment for {timeView === "quarterly" ? selectedQuarter : timeData.currentYear}
+          </p>
+        </CardHeader>
+        <CardContent>
+          {kriData ? (
+            <div className="space-y-6">
+              {/* Radar Chart */}
+              <div className="flex justify-center">
+                <RadarChart data={kriData} />
+              </div>
+              
+              {/* KRI Summary Metrics */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
+                <div className="text-center p-3 bg-neutral-800 rounded-lg border border-neutral-700">
+                  <div className="text-lg font-bold text-blue-400">
+                    {Math.round(kriData.threatVolume)}%
+                  </div>
+                  <div className="text-xs text-neutral-400">Threat Volume</div>
+                </div>
+                <div className="text-center p-3 bg-neutral-800 rounded-lg border border-neutral-700">
+                  <div className="text-lg font-bold text-green-400">
+                    {Math.round(kriData.costEfficiency)}%
+                  </div>
+                  <div className="text-xs text-neutral-400">Cost Efficiency</div>
+                </div>
+                <div className="text-center p-3 bg-neutral-800 rounded-lg border border-neutral-700">
+                  <div className="text-lg font-bold text-purple-400">
+                    {Math.round(kriData.detectionAccuracy)}%
+                  </div>
+                  <div className="text-xs text-neutral-400">Detection Accuracy</div>
+                </div>
+                <div className="text-center p-3 bg-neutral-800 rounded-lg border border-neutral-700">
+                  <div className="text-lg font-bold text-orange-400">
+                    {Math.round(kriData.riskExposure)}%
+                  </div>
+                  <div className="text-xs text-neutral-400">Risk Exposure</div>
+                </div>
+              </div>
+
+              {/* Risk Assessment Summary */}
+              <div className="bg-gradient-to-r from-blue-500/5 to-purple-500/5 border border-blue-500/20 rounded-xl p-4">
+                <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  Risk Assessment Summary
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div className="flex items-start gap-2">
+                    <div className={`w-2 h-2 rounded-full mt-2 ${
+                      kriData.threatVolume > 70 ? "bg-red-500" : 
+                      kriData.threatVolume > 40 ? "bg-yellow-500" : "bg-green-500"
+                    }`}></div>
+                    <div>
+                      <span className="text-white font-medium">Threat Level:</span>
+                      <span className={`ml-1 ${
+                        kriData.threatVolume > 70 ? "text-red-400" : 
+                        kriData.threatVolume > 40 ? "text-yellow-400" : "text-green-400"
+                      }`}>
+                        {kriData.threatVolume > 70 ? "High" : 
+                         kriData.threatVolume > 40 ? "Medium" : "Low"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className={`w-2 h-2 rounded-full mt-2 ${
+                      kriData.riskExposure > 70 ? "bg-red-500" : 
+                      kriData.riskExposure > 40 ? "bg-yellow-500" : "bg-green-500"
+                    }`}></div>
+                    <div>
+                      <span className="text-white font-medium">Risk Exposure:</span>
+                      <span className={`ml-1 ${
+                        kriData.riskExposure > 70 ? "text-red-400" : 
+                        kriData.riskExposure > 40 ? "text-yellow-400" : "text-green-400"
+                      }`}>
+                        {kriData.riskExposure > 70 ? "Critical" : 
+                         kriData.riskExposure > 40 ? "Elevated" : "Controlled"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <div className={`w-2 h-2 rounded-full mt-2 ${
+                      kriData.complianceScore > 90 ? "bg-green-500" : 
+                      kriData.complianceScore > 80 ? "bg-yellow-500" : "bg-red-500"
+                    }`}></div>
+                    <div>
+                      <span className="text-white font-medium">Compliance:</span>
+                      <span className={`ml-1 ${
+                        kriData.complianceScore > 90 ? "text-green-400" : 
+                        kriData.complianceScore > 80 ? "text-yellow-400" : "text-red-400"
+                      }`}>
+                        {kriData.complianceScore > 90 ? "Excellent" : 
+                         kriData.complianceScore > 80 ? "Good" : "Needs Attention"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-neutral-400">
+              <Shield className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No KRI data available for the selected period</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
