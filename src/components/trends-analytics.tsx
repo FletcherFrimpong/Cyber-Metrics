@@ -550,50 +550,9 @@ export default function TrendsAnalytics() {
               </div>
             )}
             
-            {/* Trend Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-neutral-700">
-              <div>
-                <h5 className="text-sm font-medium text-neutral-300 mb-4 flex items-center gap-2">
-                  <Target className="w-4 h-4" />
-                  Attack Volume Analysis
-                </h5>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-neutral-800 rounded border border-neutral-700">
-                    <span className="text-sm text-neutral-400">Selected Period:</span>
-                    <span className="text-white font-medium">
-                      {timeView === "quarterly" 
-                        ? selectedQuarter
-                        : timeData.currentYear
-                      }
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-neutral-800 rounded border border-neutral-700">
-                    <span className="text-sm text-neutral-400">Attacks in period:</span>
-                    <span className="text-white font-medium">
-                      {timeView === "quarterly"
-                        ? timeData.quarterlyData.find(q => q.quarter === selectedQuarter)?.attacks || 0
-                        : aggregatedData.attacks
-                      }
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-neutral-800 rounded border border-neutral-700">
-                    <span className="text-sm text-neutral-400">Cost saved in period:</span>
-                    <span className="text-green-400 font-medium">
-                      ${(timeView === "quarterly"
-                        ? (timeData.quarterlyData.find(q => q.quarter === selectedQuarter)?.costSaved || 0) / 1000000
-                        : aggregatedData.costSaved / 1000000
-                      ).toFixed(1)}M
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-neutral-800 rounded border border-neutral-700">
-                    <span className="text-sm text-neutral-400">Trend vs previous:</span>
-                    <span className={`font-medium ${aggregatedData.trend.attackChange >= 0 ? "text-green-400" : "text-red-400"}`}>
-                      {aggregatedData.trend.attackChange >= 0 ? "↗" : "↘"} {Math.abs(aggregatedData.trend.attackChange).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div>
+            {/* Cost Savings Analysis */}
+            <div className="pt-6 border-t border-neutral-700">
+              <div className="max-w-md">
                 <h5 className="text-sm font-medium text-neutral-300 mb-4 flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
                   Cost Savings Analysis
