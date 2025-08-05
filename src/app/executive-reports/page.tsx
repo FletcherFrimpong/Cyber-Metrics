@@ -280,6 +280,113 @@ export default function ExecutiveReportsPage() {
     productivityGains: 12400000
   }
 
+  // EDR Solution Performance Data
+  const edrSolutionData = {
+    platform: "CrowdStrike Falcon EDR",
+    totalEndpoints: 2847,
+    protectedEndpoints: 2847,
+    protectionRate: 100,
+    totalThreatsDetected: 551,
+    maliciousExecutablesBlocked: 551,
+    truePositiveRate: 98.2,
+    falsePositiveRate: 1.8,
+    avgResponseTime: "0.9 seconds",
+    totalCostSaved: 3250000,
+    lastUpdated: "2024-12-15",
+    
+    topDetectionRules: [
+      {
+        id: "EDR-001",
+        name: "MALICIOUS EXECUTABLE DETECTION",
+        category: "Malware Detection",
+        truePositives: 156,
+        falsePositives: 3,
+        detectionRate: 98.1,
+        avgResponseTime: "0.8 seconds",
+        costSaved: 890000,
+        threatActors: ["APT29", "Lazarus Group"],
+        fileTypes: [".exe", ".dll", ".bat", ".ps1"],
+        mitigationActions: ["Quarantine", "Block Execution", "Alert SOC"],
+        lastUpdated: "2024-12-15"
+      },
+      {
+        id: "EDR-002", 
+        name: "SUSPICIOUS PROCESS CREATION",
+        category: "Process Monitoring",
+        truePositives: 134,
+        falsePositives: 5,
+        detectionRate: 96.4,
+        avgResponseTime: "1.2 seconds",
+        costSaved: 720000,
+        threatActors: ["FIN7", "Carbanak"],
+        fileTypes: [".exe", ".scr", ".com"],
+        mitigationActions: ["Terminate Process", "Block Parent", "Isolate Host"],
+        lastUpdated: "2024-12-12"
+      },
+      {
+        id: "EDR-003",
+        name: "MEMORY INJECTION DETECTION",
+        category: "Memory Protection",
+        truePositives: 98,
+        falsePositives: 2,
+        detectionRate: 98.0,
+        avgResponseTime: "0.6 seconds",
+        costSaved: 540000,
+        threatActors: ["APT28", "Cozy Bear"],
+        fileTypes: [".dll", ".sys", "memory"],
+        mitigationActions: ["Block Injection", "Kill Process", "Memory Scan"],
+        lastUpdated: "2024-12-10"
+      },
+      {
+        id: "EDR-004",
+        name: "COMMAND & CONTROL DETECTION",
+        category: "Network Protection",
+        truePositives: 87,
+        falsePositives: 4,
+        detectionRate: 95.6,
+        avgResponseTime: "1.5 seconds",
+        costSaved: 480000,
+        threatActors: ["APT38", "Fancy Bear"],
+        fileTypes: [".exe", ".dll", "network"],
+        mitigationActions: ["Block Connection", "Quarantine", "Network Isolation"],
+        lastUpdated: "2024-12-08"
+      },
+      {
+        id: "EDR-005",
+        name: "RANSOMWARE BEHAVIOR DETECTION",
+        category: "Ransomware Protection",
+        truePositives: 76,
+        falsePositives: 1,
+        detectionRate: 98.7,
+        avgResponseTime: "0.9 seconds",
+        costSaved: 620000,
+        threatActors: ["REvil", "Conti"],
+        fileTypes: [".exe", ".dll", ".vbs"],
+        mitigationActions: ["Stop Encryption", "Restore Files", "Block Ransomware"],
+        lastUpdated: "2024-12-05"
+      }
+    ],
+    
+    threatBreakdown: {
+      maliciousExecutables: 551,
+      ransomwareAttempts: 76,
+      memoryInjection: 98,
+      commandControl: 87,
+      processInjection: 134,
+      credentialTheft: 156
+    },
+    
+    fileTypesDetected: {
+      ".exe": 234,
+      ".dll": 156,
+      ".bat": 67,
+      ".ps1": 45,
+      ".scr": 23,
+      ".com": 18,
+      ".vbs": 8
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "excellent":
@@ -448,6 +555,246 @@ export default function ExecutiveReportsPage() {
             )
           })}
         </div>
+      </div>
+
+      {/* EDR Solution Performance */}
+      <div className="space-y-4">
+        <h2 className="text-xl font-bold text-white">EDR SOLUTION PERFORMANCE</h2>
+        <p className="text-sm text-neutral-400">CrowdStrike Falcon EDR - Malicious Executable Detection & Mitigation</p>
+        
+        {/* EDR Overview Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="bg-neutral-900 border-neutral-700">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-neutral-400 tracking-wider">MALICIOUS EXECUTABLES BLOCKED</p>
+                  <p className="text-2xl font-bold text-green-400 font-mono">{edrSolutionData.maliciousExecutablesBlocked}</p>
+                  <p className="text-xs text-green-500">{edrSolutionData.truePositiveRate}% true positive rate</p>
+                </div>
+                <Shield className="w-8 h-8 text-green-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-neutral-900 border-neutral-700">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-neutral-400 tracking-wider">PROTECTED ENDPOINTS</p>
+                  <p className="text-2xl font-bold text-blue-400 font-mono">{edrSolutionData.protectedEndpoints}</p>
+                  <p className="text-xs text-blue-500">{edrSolutionData.protectionRate}% protection rate</p>
+                </div>
+                <Target className="w-8 h-8 text-blue-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-neutral-900 border-neutral-700">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-neutral-400 tracking-wider">AVG RESPONSE TIME</p>
+                  <p className="text-2xl font-bold text-orange-400 font-mono">{edrSolutionData.avgResponseTime}</p>
+                  <p className="text-xs text-orange-500">Real-time detection</p>
+                </div>
+                <Clock className="w-8 h-8 text-orange-400" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-neutral-900 border-neutral-700">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-neutral-400 tracking-wider">COST SAVINGS</p>
+                  <p className="text-2xl font-bold text-green-400 font-mono">{formatCurrency(edrSolutionData.totalCostSaved)}</p>
+                  <p className="text-xs text-green-500">From prevented incidents</p>
+                </div>
+                <DollarSign className="w-8 h-8 text-green-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* EDR Protection Rules */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-bold text-white">EDR PROTECTION RULES</h3>
+          <p className="text-sm text-neutral-400">Active Protection Rules for Malicious Executable Detection</p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {edrSolutionData.topDetectionRules.map((rule, index) => (
+              <Card key={rule.id} className="bg-neutral-900 border-neutral-700">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 bg-red-500/20 rounded-full">
+                        <span className="text-red-400 font-bold text-sm">#{index + 1}</span>
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg text-white">{rule.name}</CardTitle>
+                        <p className="text-sm text-neutral-400 font-mono">{rule.id} • {rule.category}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                        {rule.detectionRate}% DETECTION
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="text-center p-2 bg-neutral-800 rounded">
+                      <p className="text-lg font-bold text-green-400">{rule.truePositives}</p>
+                      <p className="text-xs text-neutral-400">True Positives</p>
+                    </div>
+                    <div className="text-center p-2 bg-neutral-800 rounded">
+                      <p className="text-lg font-bold text-orange-400">{rule.avgResponseTime}</p>
+                      <p className="text-xs text-neutral-400">Response Time</p>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium text-neutral-300 mb-2">FILE TYPES PROTECTED</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {rule.fileTypes.map((fileType: string) => (
+                        <Badge key={fileType} className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs">
+                          {fileType}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium text-neutral-300 mb-2">MITIGATION ACTIONS</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {rule.mitigationActions.map((action: string) => (
+                        <Badge key={action} className="bg-green-500/20 text-green-400 border-green-500/30 text-xs">
+                          {action}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center pt-2 border-t border-neutral-700">
+                    <p className="text-xs text-neutral-500">Last Updated: {rule.lastUpdated}</p>
+                    <Badge className="bg-blue-500/20 text-blue-400">Active Protection</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Top Detection Rules */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-bold text-white">PREVENTED CYBER INCIDENCE</h3>
+          <div className="grid grid-cols-1 gap-4">
+            {edrSolutionData.topDetectionRules.map((rule, index) => (
+              <Card key={rule.id} className="bg-neutral-900 border-neutral-700">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center w-8 h-8 bg-orange-500/20 rounded-full">
+                        <span className="text-orange-400 font-bold text-sm">#{index + 1}</span>
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg text-white">{rule.name}</CardTitle>
+                        <p className="text-sm text-neutral-400 font-mono">{rule.id} • {rule.category}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <Badge className="bg-green-500/20 text-green-400 border-green-500/30">
+                        {rule.detectionRate}% DETECTION RATE
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="text-center p-3 bg-neutral-800 rounded">
+                      <p className="text-2xl font-bold text-green-400">{rule.truePositives}</p>
+                      <p className="text-xs text-neutral-400">True Positives</p>
+                      <p className="text-xs text-orange-500">{rule.falsePositives} false positives</p>
+                    </div>
+                    <div className="text-center p-3 bg-neutral-800 rounded">
+                      <p className="text-2xl font-bold text-blue-400">{rule.avgResponseTime}</p>
+                      <p className="text-xs text-neutral-400">Avg Response Time</p>
+                    </div>
+                    <div className="text-center p-3 bg-neutral-800 rounded">
+                      <p className="text-2xl font-bold text-green-400">{formatCurrency(rule.costSaved)}</p>
+                      <p className="text-xs text-neutral-400">Cost Saved</p>
+                    </div>
+                    <div className="text-center p-3 bg-neutral-800 rounded">
+                      <p className="text-2xl font-bold text-purple-400">{rule.category}</p>
+                      <p className="text-xs text-neutral-400">Category</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-neutral-300 mb-2">THREAT ACTORS</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {rule.threatActors.map((actor: string) => (
+                          <Badge key={actor} className="bg-red-500/20 text-red-400 border-red-500/30">
+                            {actor}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-neutral-300 mb-2">FILE TYPES DETECTED</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {rule.fileTypes.map((fileType: string) => (
+                          <Badge key={fileType} className="bg-orange-500/20 text-orange-400 border-orange-500/30">
+                            {fileType}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-neutral-300 mb-2">MITIGATION ACTIONS</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {rule.mitigationActions.map((action: string) => (
+                          <Badge key={action} className="bg-green-500/20 text-green-400 border-green-500/30">
+                            {action}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-between items-center pt-2 border-t border-neutral-700">
+                    <p className="text-xs text-neutral-500">Last Updated: {rule.lastUpdated}</p>
+                    <div className="flex gap-2">
+                      <Badge className="bg-neutral-800 text-neutral-300">EDR Tool</Badge>
+                      <Badge className="bg-blue-500/20 text-blue-400">Malicious Executables</Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* File Type Breakdown */}
+        <Card className="bg-neutral-900 border-neutral-700">
+          <CardHeader>
+            <CardTitle className="text-lg text-white">MALICIOUS EXECUTABLE FILE TYPES DETECTED</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+              {Object.entries(edrSolutionData.fileTypesDetected).map(([fileType, count]) => (
+                <div key={fileType} className="text-center p-3 bg-neutral-800 rounded">
+                  <p className="text-lg font-bold text-orange-400">{fileType}</p>
+                  <p className="text-2xl font-bold text-white font-mono">{count}</p>
+                  <p className="text-xs text-neutral-400">detected</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Threat Intelligence & Financial Impact */}

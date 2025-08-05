@@ -38,6 +38,7 @@ interface CostSavingsData {
     mitreTechnique: string
     mitreId: string
     impact: string
+    maliciousFiles: string[]
   }[]
   realWorldIncidents: {
     company: string
@@ -75,14 +76,32 @@ export default function CostSavingsView() {
       amount: 8.2,
       percentage: 33.5,
       trend: 'up',
-      description: "Prevented 23 ransomware attacks",
+      description: "EDR blocked 23 ransomware attempts",
       icon: Shield,
       color: 'text-green-400',
       bgColor: 'bg-green-500/20',
       threats: [
-        { name: "Data Encrypted for Impact", mitreTechnique: "Data Encrypted for Impact", mitreId: "T1486", impact: "Data loss, Ransomware" },
-        { name: "Data Manipulation", mitreTechnique: "Data Manipulation", mitreId: "T1565", impact: "Data integrity, Ransomware" },
-        { name: "Service Stop", mitreTechnique: "Service Stop", mitreId: "T1489", impact: "Service disruption, Ransomware" }
+        { 
+          name: "Data Encrypted for Impact", 
+          mitreTechnique: "Data Encrypted for Impact", 
+          mitreId: "T1486", 
+          impact: "Data loss, Ransomware",
+          maliciousFiles: ["crypto_locker.exe", "wannacry_encryptor.dll", "locky_ransomware.bat", "cerber_encryptor.vbs", "ryuk_encryptor.ps1", "sodinokibi_loader.exe", "maze_ransomware.dll", "conti_encryptor.bat"]
+        },
+        { 
+          name: "Data Manipulation", 
+          mitreTechnique: "Data Manipulation", 
+          mitreId: "T1565", 
+          impact: "Data integrity, Ransomware",
+          maliciousFiles: ["data_corruptor.ps1", "file_modifier.exe", "integrity_breaker.dll", "malware_manipulator.bat", "bitmap_manipulator.exe", "registry_modifier.dll", "file_encryptor.ps1", "data_destroyer.bat"]
+        },
+        { 
+          name: "Service Stop", 
+          mitreTechnique: "Service Stop", 
+          mitreId: "T1489", 
+          impact: "Service disruption, Ransomware",
+          maliciousFiles: ["service_killer.exe", "process_terminator.dll", "system_disruptor.ps1", "service_blocker.bat", "svchost_terminator.exe", "windows_service_killer.dll", "process_eliminator.ps1", "system_crasher.bat"]
+        }
       ],
       realWorldIncidents: [
         { 
@@ -113,14 +132,32 @@ export default function CostSavingsView() {
       amount: 6.8,
       percentage: 27.8,
       trend: 'up',
-      description: "Blocked 156 data exfiltration attempts",
+      description: "EDR blocked 156 data exfiltration attempts",
       icon: Target,
       color: 'text-blue-400',
       bgColor: 'bg-blue-500/20',
       threats: [
-        { name: "Automated Exfiltration", mitreTechnique: "Automated Exfiltration", mitreId: "T1020", impact: "Data loss, Privacy breach" },
-        { name: "Data Transfer Size Limits", mitreTechnique: "Data Transfer Size Limits", mitreId: "T1030", impact: "Data loss, Privacy breach" },
-        { name: "Exfiltration Over Alternative Protocol", mitreTechnique: "Exfiltration Over Alternative Protocol", mitreId: "T1048", impact: "Data loss, Privacy breach" }
+        { 
+          name: "Automated Exfiltration", 
+          mitreTechnique: "Automated Exfiltration", 
+          mitreId: "T1020", 
+          impact: "Data loss, Privacy breach",
+          maliciousFiles: ["data_stealer.exe", "auto_exfiltrator.dll", "batch_data_thief.ps1", "automated_harvester.bat", "credential_harvester.exe", "password_dumper.dll", "cookie_stealer.ps1", "session_hijacker.bat"]
+        },
+        { 
+          name: "Data Transfer Size Limits", 
+          mitreTechnique: "Data Transfer Size Limits", 
+          mitreId: "T1030", 
+          impact: "Data loss, Privacy breach",
+          maliciousFiles: ["chunked_exfiltrator.exe", "data_splitter.dll", "transfer_limiter.ps1", "size_evader.bat", "ftp_data_thief.exe", "sftp_stealer.dll", "webdav_exfiltrator.ps1", "cloud_storage_thief.bat"]
+        },
+        { 
+          name: "Exfiltration Over Alternative Protocol", 
+          mitreTechnique: "Exfiltration Over Alternative Protocol", 
+          mitreId: "T1048", 
+          impact: "Data loss, Privacy breach",
+          maliciousFiles: ["dns_exfiltrator.exe", "ftp_data_thief.dll", "http_stealer.ps1", "protocol_abuser.bat", "icmp_data_thief.exe", "smtp_exfiltrator.dll", "irc_channel_stealer.ps1", "tor_exit_node_thief.bat"]
+        }
       ],
       realWorldIncidents: [
         { 
@@ -151,14 +188,32 @@ export default function CostSavingsView() {
       amount: 4.5,
       percentage: 18.4,
       trend: 'stable',
-      description: "Maintained 99.9% uptime",
+      description: "EDR prevented service disruptions",
       icon: CheckCircle,
       color: 'text-purple-400',
       bgColor: 'bg-purple-500/20',
       threats: [
-        { name: "Network Denial of Service", mitreTechnique: "Network Denial of Service", mitreId: "T1498", impact: "Service disruption, Revenue loss" },
-        { name: "Endpoint Denial of Service", mitreTechnique: "Endpoint Denial of Service", mitreId: "T1499", impact: "Service disruption, Productivity loss" },
-        { name: "Application or System Exploitation", mitreTechnique: "Application or System Exploitation", mitreId: "T1499.002", impact: "Service disruption, Data loss" }
+        { 
+          name: "Network Denial of Service", 
+          mitreTechnique: "Network Denial of Service", 
+          mitreId: "T1498", 
+          impact: "Service disruption, Revenue loss",
+          maliciousFiles: ["ddos_botnet.exe", "network_flooder.dll", "traffic_generator.ps1", "bandwidth_killer.bat", "syn_flooder.exe", "udp_amplifier.dll", "http_flooder.ps1", "slowloris_attacker.bat"]
+        },
+        { 
+          name: "Endpoint Denial of Service", 
+          mitreTechnique: "Endpoint Denial of Service", 
+          mitreId: "T1499", 
+          impact: "Service disruption, Productivity loss",
+          maliciousFiles: ["cpu_exhaustor.exe", "memory_flooder.dll", "resource_drainer.ps1", "system_crasher.bat", "fork_bomb.exe", "memory_leaker.dll", "disk_filler.ps1", "process_spammer.bat"]
+        },
+        { 
+          name: "Application or System Exploitation", 
+          mitreTechnique: "Application or System Exploitation", 
+          mitreId: "T1499.002", 
+          impact: "Service disruption, Data loss",
+          maliciousFiles: ["app_exploiter.exe", "system_breaker.dll", "service_killer.ps1", "process_terminator.bat", "buffer_overflow_exploit.exe", "heap_corruption.dll", "integer_overflow.ps1", "format_string_attacker.bat"]
+        }
       ],
       realWorldIncidents: [
         { 
@@ -189,14 +244,32 @@ export default function CostSavingsView() {
       amount: 3.2,
       percentage: 13.1,
       trend: 'up',
-      description: "Zero compliance violations",
+      description: "EDR prevented compliance violations",
       icon: Building,
       color: 'text-orange-400',
       bgColor: 'bg-orange-500/20',
       threats: [
-        { name: "Trusted Relationship", mitreTechnique: "Trusted Relationship", mitreId: "T1199", impact: "Compliance violation, Financial penalty" },
-        { name: "Valid Accounts", mitreTechnique: "Valid Accounts", mitreId: "T1078", impact: "Compliance violation, Data breach" },
-        { name: "Default Accounts", mitreTechnique: "Default Accounts", mitreId: "T1078.001", impact: "Compliance violation, Security breach" }
+        { 
+          name: "Trusted Relationship", 
+          mitreTechnique: "Trusted Relationship", 
+          mitreId: "T1199", 
+          impact: "Compliance violation, Financial penalty",
+          maliciousFiles: ["trusted_abuser.exe", "relationship_exploiter.dll", "partner_compromise.ps1", "vendor_attack.bat", "supply_chain_attacker.exe", "third_party_exploiter.dll", "vendor_backdoor.ps1", "partner_credential_thief.bat"]
+        },
+        { 
+          name: "Valid Accounts", 
+          mitreTechnique: "Valid Accounts", 
+          mitreId: "T1078", 
+          impact: "Compliance violation, Data breach",
+          maliciousFiles: ["credential_stealer.exe", "account_hijacker.dll", "password_cracker.ps1", "login_abuser.bat", "kerberoasting_attacker.exe", "pass_the_hash.dll", "golden_ticket_forger.ps1", "silver_ticket_creator.bat"]
+        },
+        { 
+          name: "Default Accounts", 
+          mitreTechnique: "Default Accounts", 
+          mitreId: "T1078.001", 
+          impact: "Compliance violation, Security breach",
+          maliciousFiles: ["default_exploiter.exe", "admin_abuser.dll", "root_access.ps1", "privilege_escalator.bat", "admin_account_abuser.exe", "root_kit_installer.dll", "privilege_escalation.ps1", "sudo_abuser.bat"]
+        }
       ],
       realWorldIncidents: [
         { 
@@ -227,14 +300,32 @@ export default function CostSavingsView() {
       amount: 1.8,
       percentage: 7.2,
       trend: 'stable',
-      description: "Prevented brand damage",
+      description: "EDR prevented brand damage",
       icon: Users,
       color: 'text-pink-400',
       bgColor: 'bg-pink-500/20',
       threats: [
-        { name: "Phishing", mitreTechnique: "Phishing", mitreId: "T1566", impact: "Brand damage, Customer trust loss" },
-        { name: "Drive-by Compromise", mitreTechnique: "Drive-by Compromise", mitreId: "T1189", impact: "Brand damage, Customer compromise" },
-        { name: "Spearphishing Link", mitreTechnique: "Spearphishing Link", mitreId: "T1566.002", impact: "Brand damage, Targeted attack" }
+        { 
+          name: "Phishing", 
+          mitreTechnique: "Phishing", 
+          mitreId: "T1566", 
+          impact: "Brand damage, Customer trust loss",
+          maliciousFiles: ["phishing_kit.exe", "fake_login.dll", "credential_harvester.ps1", "social_engineer.bat", "evilginx_proxy.exe", "credential_harvester.dll", "phishing_simulator.ps1", "social_engineering_toolkit.bat"]
+        },
+        { 
+          name: "Drive-by Compromise", 
+          mitreTechnique: "Drive-by Compromise", 
+          mitreId: "T1189", 
+          impact: "Brand damage, Customer compromise",
+          maliciousFiles: ["driveby_exploit.exe", "browser_hijacker.dll", "malicious_redirect.ps1", "web_compromise.bat", "watering_hole_attacker.exe", "malicious_ad_injector.dll", "iframe_injector.ps1", "malware_dropper.bat"]
+        },
+        { 
+          name: "Spearphishing Link", 
+          mitreTechnique: "Spearphishing Link", 
+          mitreId: "T1566.002", 
+          impact: "Brand damage, Targeted attack",
+          maliciousFiles: ["targeted_phish.exe", "spear_attacker.dll", "custom_lure.ps1", "precision_strike.bat", "whaling_attacker.exe", "ceo_fraud_simulator.dll", "business_email_compromise.ps1", "invoice_fraud_attacker.bat"]
+        }
       ],
       realWorldIncidents: [
         { 
@@ -429,14 +520,31 @@ export default function CostSavingsView() {
                       <div className="p-3 space-y-2">
                         <p className="text-xs text-neutral-400 font-medium">Sample Threats (MITRE ATT&CK):</p>
                         {item.threats.map((threat, threatIndex) => (
-                          <div key={threatIndex} className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-[10px] px-1 py-0 border-blue-500/30 text-blue-400">
-                                {threat.mitreId}
-                              </Badge>
-                              <span className="text-neutral-300">{threat.name}</span>
+                          <div key={threatIndex} className="space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-[10px] px-1 py-0 border-blue-500/30 text-blue-400">
+                                  {threat.mitreId}
+                                </Badge>
+                                <span className="text-neutral-300">{threat.name}</span>
+                              </div>
+                              <span className="text-neutral-500 text-[10px]">{threat.impact}</span>
                             </div>
-                            <span className="text-neutral-500 text-[10px]">{threat.impact}</span>
+                            <div className="ml-6 space-y-1">
+                              <p className="text-[9px] text-green-400 font-medium">Prevented and Investigated:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {threat.maliciousFiles.map((file, fileIndex) => (
+                                  <Badge 
+                                    key={fileIndex} 
+                                    variant="outline" 
+                                    className="text-[8px] px-1 py-0 border-green-500/30 text-green-400 bg-green-500/10"
+                                  >
+                                    {file} ✓
+                                  </Badge>
+                                ))}
+                              </div>
+                              <p className="text-[8px] text-green-300 mt-1">True positive alerts - prevented and investigated</p>
+                            </div>
                           </div>
                         ))}
                       </div>

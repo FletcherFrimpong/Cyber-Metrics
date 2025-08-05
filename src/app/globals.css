@@ -174,6 +174,39 @@
   background: hsl(var(--primary));
 }
 
+/* Enhanced smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  scroll-behavior: smooth;
+}
+
+/* Smooth scrolling for all scrollable elements */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Optimize scrolling performance */
+.scroll-smooth {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Reduce scroll chaining */
+.overflow-y-auto {
+  overscroll-behavior-y: contain;
+}
+
+/* Smooth momentum scrolling for iOS */
+@supports (-webkit-overflow-scrolling: touch) {
+  .scroll-smooth {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 /* Apply enhanced styling to select content */
 [data-slot="select-content"] {
   backdrop-filter: blur(8px);
