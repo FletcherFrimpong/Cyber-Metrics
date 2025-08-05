@@ -568,30 +568,63 @@ export default function TrendsAnalytics() {
               </div>
               
               {/* KRI Summary Metrics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
-                <div className="text-center p-3 bg-neutral-800 rounded-lg border border-neutral-700">
-                  <div className="text-lg font-bold text-blue-400">
-                    {Math.round(kriData.threatVolume)}%
+              <div className="space-y-6 pt-6">
+                <h4 className="text-sm font-medium text-neutral-300 text-center">Key Risk Indicators Summary</h4>
+                
+                {/* First Row - Critical Metrics */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div className="text-center p-4 bg-neutral-800 rounded-lg border border-neutral-700 hover:border-blue-500/50 transition-colors">
+                    <div className="text-xl font-bold text-blue-400 mb-1">
+                      {Math.round(kriData.threatVolume)}%
+                    </div>
+                    <div className="text-xs text-neutral-400 font-medium">Threat Volume</div>
                   </div>
-                  <div className="text-xs text-neutral-400">Threat Volume</div>
+                  <div className="text-center p-4 bg-neutral-800 rounded-lg border border-neutral-700 hover:border-green-500/50 transition-colors">
+                    <div className="text-xl font-bold text-green-400 mb-1">
+                      {Math.round(kriData.costEfficiency)}%
+                    </div>
+                    <div className="text-xs text-neutral-400 font-medium">Cost Efficiency</div>
+                  </div>
+                  <div className="text-center p-4 bg-neutral-800 rounded-lg border border-neutral-700 hover:border-purple-500/50 transition-colors">
+                    <div className="text-xl font-bold text-purple-400 mb-1">
+                      {Math.round(kriData.detectionAccuracy)}%
+                    </div>
+                    <div className="text-xs text-neutral-400 font-medium">Detection Accuracy</div>
+                  </div>
+                  <div className="text-center p-4 bg-neutral-800 rounded-lg border border-neutral-700 hover:border-orange-500/50 transition-colors">
+                    <div className="text-xl font-bold text-orange-400 mb-1">
+                      {Math.round(kriData.riskExposure)}%
+                    </div>
+                    <div className="text-xs text-neutral-400 font-medium">Risk Exposure</div>
+                  </div>
                 </div>
-                <div className="text-center p-3 bg-neutral-800 rounded-lg border border-neutral-700">
-                  <div className="text-lg font-bold text-green-400">
-                    {Math.round(kriData.costEfficiency)}%
+
+                {/* Second Row - Additional Metrics */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div className="text-center p-4 bg-neutral-800 rounded-lg border border-neutral-700 hover:border-cyan-500/50 transition-colors">
+                    <div className="text-xl font-bold text-cyan-400 mb-1">
+                      {Math.round(kriData.responseTime)}%
+                    </div>
+                    <div className="text-xs text-neutral-400 font-medium">Response Time</div>
                   </div>
-                  <div className="text-xs text-neutral-400">Cost Efficiency</div>
-                </div>
-                <div className="text-center p-3 bg-neutral-800 rounded-lg border border-neutral-700">
-                  <div className="text-lg font-bold text-purple-400">
-                    {Math.round(kriData.detectionAccuracy)}%
+                  <div className="text-center p-4 bg-neutral-800 rounded-lg border border-neutral-700 hover:border-yellow-500/50 transition-colors">
+                    <div className="text-xl font-bold text-yellow-400 mb-1">
+                      {Math.round(kriData.coverageGap)}%
+                    </div>
+                    <div className="text-xs text-neutral-400 font-medium">Coverage Gap</div>
                   </div>
-                  <div className="text-xs text-neutral-400">Detection Accuracy</div>
-                </div>
-                <div className="text-center p-3 bg-neutral-800 rounded-lg border border-neutral-700">
-                  <div className="text-lg font-bold text-orange-400">
-                    {Math.round(kriData.riskExposure)}%
+                  <div className="text-center p-4 bg-neutral-800 rounded-lg border border-neutral-700 hover:border-emerald-500/50 transition-colors">
+                    <div className="text-xl font-bold text-emerald-400 mb-1">
+                      {Math.round(kriData.complianceScore)}%
+                    </div>
+                    <div className="text-xs text-neutral-400 font-medium">Compliance Score</div>
                   </div>
-                  <div className="text-xs text-neutral-400">Risk Exposure</div>
+                  <div className="text-center p-4 bg-neutral-800 rounded-lg border border-neutral-700 hover:border-amber-500/50 transition-colors">
+                    <div className="text-xl font-bold text-amber-400 mb-1">
+                      {Math.round(kriData.incidentSeverity)}%
+                    </div>
+                    <div className="text-xs text-neutral-400 font-medium">Incident Severity</div>
+                  </div>
                 </div>
               </div>
 
