@@ -245,7 +245,7 @@ export default function TrendsAnalytics() {
 
     return (
       <div className="relative w-full h-80 flex items-center justify-center">
-        <svg width="300" height="300" className="transform -rotate-90">
+        <svg width="300" height="300" className="transform -rotate-90 mx-auto">
           {/* Background circles */}
           {[20, 40, 60, 80, 100].map((level) => (
             <circle
@@ -336,8 +336,8 @@ export default function TrendsAnalytics() {
         </div>
 
         {/* Legend */}
-        <div className="absolute -bottom-8 left-0 right-0">
-          <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="absolute -bottom-8 left-0 right-0 flex justify-center">
+          <div className="grid grid-cols-2 gap-2 text-xs max-w-md">
             {metrics.map((metric, index) => (
               <div key={index} className="flex items-center gap-2">
                 <div 
@@ -563,7 +563,7 @@ export default function TrendsAnalytics() {
           {kriData ? (
             <div className="space-y-6">
               {/* Radar Chart */}
-              <div className="flex justify-center">
+              <div className="flex justify-center items-center w-full">
                 <RadarChart data={kriData} />
               </div>
               
