@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import edrDataService from "@/lib/edr-data-service"
+import { calculateCostMetrics, calculateCostSavingsFromEDRAlerts, formatCurrency } from "@/lib/cost-calculations"
 import { 
   FileText, 
   Download, 
@@ -13,7 +15,6 @@ import {
   DollarSign, 
   Target, 
   BarChart3,
-  Mail,
   Lock,
   Eye,
   AlertTriangle,
@@ -21,189 +22,216 @@ import {
   XCircle,
   Clock,
   Users,
-  Globe,
   Server,
   Database,
-  Network,
-  Smartphone,
-  Cloud
+  Smartphone
 } from "lucide-react"
 
 export default function ExecutiveReportsPage() {
   const [selectedQuarter, setSelectedQuarter] = useState("Q4 2024")
   const [selectedMetric, setSelectedMetric] = useState("overview")
+  const [analysisPeriod, setAnalysisPeriod] = useState<"quarterly" | "yearly" | "monthly">("quarterly")
 
-  // Quarterly Security Metrics for Board Presentation
-  const quarterlyMetrics = {
+  // Helper to parse quarter string e.g., "Q2 2025"
+  const parseQuarter = (qstr: string) => {
+    const [q, y] = qstr.split(" ");
+    return { q: parseInt(q.replace("Q", ""), 10), y: parseInt(y, 10) };
+  };
+
+
+
+  const [quarterlyMetrics, setQuarterlyMetrics] = useState({
     quarter: "Q4 2024",
     period: "October 1 - December 31, 2024",
-    totalCostSavings: 24500000,
-    roi: 340,
-    breachesPreventedValue: 156000000,
-    complianceSavings: 8900000,
-    totalSecurityIncidents: 1247,
-    criticalIncidents: 23,
-    resolvedIncidents: 1189,
+    totalCostSavings: 0,
+    roi: 0,
+    breachesPreventedValue: 0,
+    complianceSavings: 0,
+    totalSecurityIncidents: 0,
+    criticalIncidents: 0,
+    resolvedIncidents: 0,
     avgResolutionTime: "2.3 hours",
     securityScore: 94.2,
-  }
+  });
 
-  // Security Tool Metrics by Category
-  const securityToolMetrics = {
-    emailSecurity: {
-      name: "Email Security",
-      icon: Mail,
-      metrics: {
-        totalEmails: 2847000,
-        maliciousEmails: 1247,
-        blockedEmails: 1247,
-        blockedRate: 100,
-        phishingAttempts: 892,
-        malwareAttachments: 355,
-        avgDetectionTime: "0.3 seconds",
-        costSaved: 4200000,
+  // Security Metrics for Board Presentation - Dynamic based on analysis period
+  useEffect(() => {
+    const loadSecurityMetrics = async () => {
+      try {
+        const baseIncidents = 1247;
+        const baseCriticalIncidents = 23;
+        const baseResolvedIncidents = 1189;
+        
+        // Scale incidents based on period
+        let incidentScale = 1;
+        if (analysisPeriod === "yearly") {
+          incidentScale = 4; // 4 quarters in a year
+        } else if (analysisPeriod === "quarterly") {
+          incidentScale = 1; // Already per-quarter baseline
+        } else if (analysisPeriod === "monthly") {
+          incidentScale = 1 / 3; // One third of a quarter
+        }
+        
+        // Get quarter display info
+        const { q, y } = parseQuarter(selectedQuarter);
+        const quarterDisplay = analysisPeriod === "quarterly" ? `Q${q} ${y}` : analysisPeriod === "yearly" ? `${y}` : "December 2024";
+        
+        // Get period display info
+        const getPeriodDisplay = () => {
+          if (analysisPeriod === "yearly") return `January 1 - December 31, ${y}`;
+          if (analysisPeriod === "monthly") return "December 1 - December 31, 2024";
+          
+          // For quarterly, calculate the actual quarter period
+          const quarterStartMonths = ["January", "April", "July", "October"];
+          const quarterEndMonths = ["March", "June", "September", "December"];
+          const startMonth = quarterStartMonths[q - 1];
+          const endMonth = quarterEndMonths[q - 1];
+          return `${startMonth} 1 - ${endMonth} 31, ${y}`;
+        };
+
+        const settingsRes = await fetch("/api/settings").catch(() => null);
+        const settings = settingsRes ? await settingsRes.json() : {};
+        const investment = settings.investmentAmount || 0;
+
+        const totalCostSavings = await calculateCostSavingsFromEDRAlerts({ period: analysisPeriod, selectedQuarter, investmentAmount: investment });
+        const costMetrics = await calculateCostMetrics({ period: analysisPeriod, selectedQuarter, investmentAmount: investment });
+        
+        setQuarterlyMetrics({
+          quarter: quarterDisplay,
+          period: getPeriodDisplay(),
+          totalCostSavings,
+          roi: costMetrics.roi,
+          breachesPreventedValue: Math.round(totalCostSavings * 6.4),
+          complianceSavings: Math.round(totalCostSavings * 0.36),
+          totalSecurityIncidents: Math.round(baseIncidents * incidentScale),
+          criticalIncidents: Math.round(baseCriticalIncidents * incidentScale),
+          resolvedIncidents: Math.round(baseResolvedIncidents * incidentScale),
+          avgResolutionTime: "2.3 hours",
+          securityScore: 94.2,
+        });
+      } catch (error) {
+        console.error('Failed to load security metrics:', error);
+      }
+    };
+
+    loadSecurityMetrics();
+  }, [analysisPeriod, selectedQuarter]);
+
+  // Security Tool Metrics by Category - Dynamic based on analysis period
+  const getSecurityToolMetrics = (period: "quarterly" | "yearly" | "monthly") => {
+    // Scale metrics based on period
+    let scale = 1;
+    if (period === "yearly") {
+      scale = 4; // 4 quarters in a year
+    } else if (period === "quarterly") {
+      scale = 1; // Already per-quarter baseline
+    } else if (period === "monthly") {
+      scale = 1 / 3; // One third of a quarter
+    }
+
+            return {
+      antivirus: {
+        name: "Antivirus Protection",
+        icon: Shield,
+        metrics: {
+          totalScans: Math.round(1847000 * scale),
+          threatsDetected: Math.round(2347 * scale),
+          threatsQuarantined: Math.round(2347 * scale),
+          quarantineRate: 100,
+          ransomwareAttempts: Math.round(156 * scale),
+          zeroDayThreats: Math.round(23 * scale),
+          avgScanTime: "45 seconds",
+          costSaved: Math.round(3800000 * scale),
+        },
+        status: "excellent"
       },
-      status: "excellent"
-    },
-    antivirus: {
-      name: "Antivirus Protection",
-      icon: Shield,
-      metrics: {
-        totalScans: 1847000,
-        threatsDetected: 2347,
-        threatsQuarantined: 2347,
-        quarantineRate: 100,
-        ransomwareAttempts: 156,
-        zeroDayThreats: 23,
-        avgScanTime: "45 seconds",
-        costSaved: 3800000,
+          endpointProtection: {
+        name: "Endpoint Protection",
+        icon: Smartphone,
+        metrics: {
+          totalEndpoints: 2847,
+          compromisedEndpoints: 0,
+          protectionRate: 100,
+          suspiciousActivities: Math.round(456 * scale),
+          quarantinedFiles: Math.round(234 * scale),
+          avgResponseTime: "2.1 minutes",
+          costSaved: 0, // Will be calculated asynchronously
+          truePositiveAlerts: Math.round(quarterlyMetrics.totalSecurityIncidents * 0.36 * scale),
+          totalAlerts: Math.round(quarterlyMetrics.totalSecurityIncidents * scale),
+        },
+        status: "excellent"
       },
-      status: "excellent"
-    },
-    firewall: {
-      name: "Network Firewall",
-      icon: Network,
-      metrics: {
-        totalConnections: 12470000,
-        blockedConnections: 45678,
-        blockedRate: 99.6,
-        ddosAttempts: 234,
-        unauthorizedAccess: 1234,
-        avgResponseTime: "0.1 seconds",
-        costSaved: 5200000,
+          identityAccess: {
+        name: "Identity & Access Management",
+        icon: Users,
+        metrics: {
+          totalUsers: 2847,
+          failedLogins: Math.round(1234 * scale),
+          suspiciousLogins: Math.round(89 * scale),
+          mfaEnabled: 100,
+          privilegedAccess: Math.round(234 * scale),
+          avgAuthTime: "3.2 seconds",
+          costSaved: Math.round(2800000 * scale),
+        },
+        status: "good"
       },
-      status: "excellent"
-    },
-    endpointProtection: {
-      name: "Endpoint Protection",
-      icon: Smartphone,
-      metrics: {
-        totalEndpoints: 2847,
-        compromisedEndpoints: 0,
-        protectionRate: 100,
-        suspiciousActivities: 456,
-        quarantinedFiles: 234,
-        avgResponseTime: "2.1 minutes",
-        costSaved: 3100000,
+          dataProtection: {
+        name: "Data Protection & Encryption",
+        icon: Database,
+        metrics: {
+          encryptedData: 99.8,
+          dataBreaches: 0,
+          encryptionAlerts: Math.round(156 * scale),
+          complianceScore: 98.5,
+          auditFindings: 0,
+          avgEncryptionTime: "0.5 seconds",
+          costSaved: Math.round(5400000 * scale),
+        },
+        status: "excellent"
       },
-      status: "excellent"
-    },
-    identityAccess: {
-      name: "Identity & Access Management",
-      icon: Users,
-      metrics: {
-        totalUsers: 2847,
-        failedLogins: 1234,
-        suspiciousLogins: 89,
-        mfaEnabled: 100,
-        privilegedAccess: 234,
-        avgAuthTime: "3.2 seconds",
-        costSaved: 2800000,
+    
+          intrusionDetection: {
+        name: "Intrusion Detection System",
+        icon: AlertTriangle,
+        metrics: {
+          totalEvents: Math.round(1247000 * scale),
+          alertsGenerated: Math.round(2347 * scale),
+          truePositives: Math.round(2234 * scale),
+          falsePositives: Math.round(113 * scale),
+          detectionRate: 95.2,
+          avgResponseTime: "1.8 minutes",
+          costSaved: Math.round(3600000 * scale),
+        },
+        status: "good"
       },
-      status: "good"
-    },
-    dataProtection: {
-      name: "Data Protection & Encryption",
-      icon: Database,
-      metrics: {
-        encryptedData: 99.8,
-        dataBreaches: 0,
-        encryptionAlerts: 156,
-        complianceScore: 98.5,
-        auditFindings: 0,
-        avgEncryptionTime: "0.5 seconds",
-        costSaved: 5400000,
+          siem: {
+        name: "Security Information & Event Management",
+        icon: Server,
+        metrics: {
+          totalLogs: Math.round(28470000 * scale),
+          correlatedEvents: Math.round(12470 * scale),
+          incidentsCreated: Math.round(2347 * scale),
+          automatedResponses: Math.round(1890 * scale),
+          avgProcessingTime: "0.5 seconds",
+          costSaved: Math.round(4100000 * scale),
+        },
+        status: "excellent"
       },
-      status: "excellent"
-    },
-    webApplicationFirewall: {
-      name: "Web Application Firewall",
-      icon: Globe,
-      metrics: {
-        totalRequests: 8470000,
-        blockedRequests: 23456,
-        blockedRate: 99.7,
-        sqlInjectionAttempts: 1234,
-        xssAttempts: 567,
-        avgResponseTime: "0.2 seconds",
-        costSaved: 2900000,
+          vulnerabilityManagement: {
+        name: "Vulnerability Management",
+        icon: CheckCircle,
+        metrics: {
+          totalAssets: 2847,
+          vulnerabilitiesFound: Math.round(456 * scale),
+          criticalVulns: Math.round(23 * scale),
+          patchedVulns: Math.round(423 * scale),
+          patchRate: 92.8,
+          avgPatchTime: "3.2 days",
+          costSaved: Math.round(2700000 * scale),
+        },
+        status: "good"
       },
-      status: "excellent"
-    },
-    intrusionDetection: {
-      name: "Intrusion Detection System",
-      icon: AlertTriangle,
-      metrics: {
-        totalEvents: 1247000,
-        alertsGenerated: 2347,
-        truePositives: 2234,
-        falsePositives: 113,
-        detectionRate: 95.2,
-        avgResponseTime: "1.8 minutes",
-        costSaved: 3600000,
-      },
-      status: "good"
-    },
-    siem: {
-      name: "Security Information & Event Management",
-      icon: Server,
-      metrics: {
-        totalLogs: 28470000,
-        correlatedEvents: 12470,
-        incidentsCreated: 2347,
-        automatedResponses: 1890,
-        avgProcessingTime: "0.5 seconds",
-        costSaved: 4100000,
-      },
-      status: "excellent"
-    },
-    vulnerabilityManagement: {
-      name: "Vulnerability Management",
-      icon: CheckCircle,
-      metrics: {
-        totalAssets: 2847,
-        vulnerabilitiesFound: 456,
-        criticalVulns: 23,
-        patchedVulns: 423,
-        patchRate: 92.8,
-        avgPatchTime: "3.2 days",
-        costSaved: 2700000,
-      },
-      status: "good"
-    },
-    cloudSecurity: {
-      name: "Cloud Security",
-      icon: Cloud,
-      metrics: {
-        cloudResources: 1247,
-        securityMisconfigurations: 89,
-        remediatedIssues: 87,
-        complianceScore: 96.2,
-        avgRemediationTime: "4.1 hours",
-        costSaved: 3200000,
-      },
-      status: "good"
-    },
+    
     mobileSecurity: {
       name: "Mobile Device Management",
       icon: Smartphone,
@@ -213,11 +241,14 @@ export default function ExecutiveReportsPage() {
         complianceRate: 98.7,
         securityIncidents: 24,
         avgEnforcementTime: "2.3 minutes",
-        costSaved: 1800000,
+        costSaved: Math.round(1800000 * scale),
       },
       status: "excellent"
     }
-  }
+  };
+  };
+
+  const securityToolMetrics = getSecurityToolMetrics(analysisPeriod);
 
   // Threat Intelligence Metrics
   const threatIntelligence = {
@@ -271,13 +302,13 @@ export default function ExecutiveReportsPage() {
   // Financial Impact Analysis
   const financialImpact = {
     totalInvestment: 7200000,
-    totalSavings: 24500000,
-    roi: 340,
+    totalSavings: 0, // Will be calculated asynchronously
+    roi: 0, // Will be calculated asynchronously
     costPerIncident: 125000,
-    incidentsPrevented: 196,
-    compliancePenaltiesAvoided: 8900000,
-    insuranceSavings: 3200000,
-    productivityGains: 12400000
+    incidentsPrevented: 0, // Will be calculated asynchronously
+    compliancePenaltiesAvoided: 0, // Will be calculated asynchronously
+    insuranceSavings: 0, // Will be calculated asynchronously
+    productivityGains: 0 // Will be calculated asynchronously
   }
 
   // EDR Solution Performance Data
@@ -286,12 +317,12 @@ export default function ExecutiveReportsPage() {
     totalEndpoints: 2847,
     protectedEndpoints: 2847,
     protectionRate: 100,
-    totalThreatsDetected: 551,
-    maliciousExecutablesBlocked: 551,
+    totalThreatsDetected: quarterlyMetrics.totalSecurityIncidents,
+    maliciousExecutablesBlocked: Math.round(quarterlyMetrics.totalSecurityIncidents * 0.85),
     truePositiveRate: 98.2,
     falsePositiveRate: 1.8,
     avgResponseTime: "0.9 seconds",
-    totalCostSaved: 3250000,
+    totalCostSaved: 0, // Will be calculated asynchronously
     lastUpdated: "2024-12-15",
     
     topDetectionRules: [
@@ -425,7 +456,58 @@ export default function ExecutiveReportsPage() {
           <p className="text-sm text-neutral-400">Board of Directors Presentation - {quarterlyMetrics.quarter}</p>
           <p className="text-xs text-neutral-500">Period: {quarterlyMetrics.period}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          {/* Analysis Period Toolbar */}
+          <div className="flex items-center gap-3 bg-neutral-800/50 border border-neutral-700/50 rounded-lg px-4 py-2">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-neutral-400" />
+              <span className="text-sm text-neutral-300 font-medium">Analysis Period:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={analysisPeriod === "quarterly" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAnalysisPeriod("quarterly")}
+                className={`text-xs ${
+                  analysisPeriod === "quarterly" 
+                    ? "bg-orange-600 hover:bg-orange-700 text-white" 
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Quarterly
+              </Button>
+              <Button
+                variant={analysisPeriod === "yearly" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAnalysisPeriod("yearly")}
+                className={`text-xs ${
+                  analysisPeriod === "yearly" 
+                    ? "bg-orange-600 hover:bg-orange-700 text-white" 
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Yearly
+              </Button>
+              <Button
+                variant={analysisPeriod === "monthly" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setAnalysisPeriod("monthly")}
+                className={`text-xs ${
+                  analysisPeriod === "monthly" 
+                    ? "bg-orange-600 hover:bg-orange-700 text-white" 
+                    : "text-neutral-400 hover:text-white"
+                }`}
+              >
+                Monthly
+              </Button>
+            </div>
+            <div className="text-xs text-neutral-500 px-2 py-1 bg-neutral-700/50 rounded">
+              {analysisPeriod === "quarterly" && selectedQuarter}
+              {analysisPeriod === "yearly" && "2024"}
+              {analysisPeriod === "monthly" && "December 2024"}
+            </div>
+          </div>
+          
           <Button onClick={generateBoardReport} className="bg-orange-600 hover:bg-orange-700">
             <Download className="w-4 h-4 mr-2" />
             Generate Board Report

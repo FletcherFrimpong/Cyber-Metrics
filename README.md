@@ -1,123 +1,167 @@
-# Cyber-Metrics - AI-Powered Cybersecurity Detection Platform
+# SignalFoundry - Cyber Risk Quantification Platform
 
-SignalFoundry is an advanced cybersecurity detection platform that centralizes detection rules and analytics from multiple security platforms like Microsoft Sentinel, Splunk, and CrowdStrike. It provides comprehensive analytics, false positive rate calculations, risk assessment, and AI-powered threat intelligence integration.
+SignalFoundry connects to your Microsoft Sentinel SIEM and quantifies the financial impact of your security operations. It pulls resolved incidents, identifies true positives using MITRE ATT&CK validation, and calculates the actual cyber risk your security tools are preventing.
 
-## 🚀 Features
+## How It Works
 
-### Core Analytics
-- **False Positive Rate Calculation**: Advanced algorithms with baseline noise adjustment
-- **Risk Assessment**: NIST framework-based risk scoring
-- **Cost Analysis**: Alert cost calculations and savings
-- **Real Data Integration**: Authentic threat intelligence from verified sources
+```
+Your Security Tools (Defender, SentinelOne, CrowdStrike, Abnormal, etc.)
+        |
+        v
+Microsoft Sentinel (your SIEM - aggregates everything)
+        |
+        v
+SignalFoundry (pulls resolved incidents via Graph Security API)
+        |
+        v
+True Positive Filter (MITRE ATT&CK validation + confidence scoring)
+        |
+        v
+Risk Quantification (actual cost impact from validated threats)
+        |
+        v
+Dashboard (ROI, net benefit, category breakdown, trends)
+```
 
-### Real Threat Intelligence Integration
-- **MITRE ATT&CK Framework**: Real technique IDs, names, and tactics
-- **CISA Cybersecurity Advisories**: Real threat actor profiles and recent attacks
-- **FBI Flash Alerts**: Real threat intelligence and attack patterns
-- **DetectionLab Project**: Real detection logs and incident data
-- **DFIR Artifact Museum**: Real forensic artifacts and analysis tools
-- **Blue Team Labs**: Real attack scenarios and detection rules
+## Alert Categories
 
-### AI-Powered Features
-- **Threat Benchmarking**: Real-time threat intelligence integration
-- **Cost Analysis**: Alert cost calculations and savings
-- **MITRE ATT&CK Mapping**: Technique and tactic correlation
+SignalFoundry maps alerts from 80+ security products into 5 categories:
 
-### Cost Analysis
-SignalFoundry provides comprehensive cost analysis:
-- **Alert Cost Calculations**: Cost per alert and total alert costs
-- **False Positive Savings**: Cost savings from preventing false positives
-- **Industry Multipliers**: Industry-specific cost adjustments
-- **Real Attack Examples**: Documented incidents with verified costs
+| Category | Example Products |
+|----------|-----------------|
+| **EDR** | Defender for Endpoint, SentinelOne, CrowdStrike, Carbon Black, Cortex XDR |
+| **Email** | Defender for Office 365, Abnormal Security, Proofpoint, Mimecast |
+| **Network** | Azure Firewall, Palo Alto, Fortinet, Cisco, Darktrace |
+| **Web** | Azure WAF, Cloudflare, Akamai, Imperva, F5 |
+| **Cloud** | Defender for Cloud, AWS GuardDuty, Prisma Cloud, Wiz, Orca |
 
-## 🛠️ Installation
+## Quick Start
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd signal-foundry
-   ```
+### 1. Install and run
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+```bash
+cd signal-foundry
+npm install
+npm run dev
+```
 
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env.local
-   # Edit .env.local with your configuration
-   ```
+Open http://localhost:3000
 
-4. **Run the development server**
-   ```bash
-   npm run dev
-   ```
+### 2. Configure (Settings page)
 
-5. **Open your browser**
-   Navigate to `http://localhost:3000`
+1. Enter your **Security Investment** amount (annual EDR/SOC/tooling spend)
+2. Connect **Microsoft Sentinel**:
+   - Create an Azure AD App Registration
+   - Add API permissions: `SecurityIncident.Read.All`, `SecurityAlert.Read.All`
+   - Grant admin consent
+   - Enter Tenant ID, Client ID, Client Secret in Settings
+   - Click "Test Connection" to verify
+   - Click "Save Settings" to start ingesting
 
-## 📊 Dashboard Features
+### 3. Data starts flowing
 
-### Real-Time Analytics
-- **Detection Rule Performance**: Real-time scoring and metrics
-- **Threat Intelligence**: Live threat actor correlation
-- **Cost Analysis**: Industry-specific attack cost calculations
-- **Compliance Impact**: Regulatory requirement mapping
+SignalFoundry polls Sentinel every 15 minutes for resolved incidents. Each incident's alerts are:
+- Categorized by product name (EDR, Email, Network, Web, Cloud)
+- Validated against MITRE ATT&CK techniques (36 techniques, risk scoring)
+- Filtered for true positives (confidence >= 85% or Critical/High severity + valid MITRE)
+- Cost impact summed from validated alerts
 
-### Alert Management
-- **Real-Time Alerts**: Live alert generation with financial impact
-- **Threat Correlation**: MITRE ATT&CK technique mapping
-- **Response Recommendations**: Actionable security guidance
+## Architecture
 
-### Executive Reporting
-- **PDF Generation**: Automated executive reports
-- **ROI Analysis**: Cost savings and financial impact
-- **Compliance Tracking**: Regulatory requirement monitoring
+```
+src/
+├── app/
+│   ├── page.tsx                    # Main dashboard with sidebar navigation
+│   ├── dashboard/                  # Executive summary + business units
+│   ├── executive-reports/          # Detailed security tool metrics
+│   ├── azure-sentinel-alerts/      # Alert browser with filtering
+│   └── api/
+│       ├── settings/               # GET/POST platform settings
+│       ├── sentinel/
+│       │   ├── webhook/            # POST - receive pushed incidents from Logic Apps
+│       │   ├── status/             # GET - connection health + alert counts
+│       │   ├── sync/               # POST - trigger manual pull
+│       │   └── test/               # POST - test connection credentials
+│       └── edr-alerts/             # Legacy alert endpoint
+├── components/
+│   ├── trends-analytics.tsx        # Main analytics dashboard
+│   ├── settings-page.tsx           # Investment + Sentinel configuration
+│   ├── azure-sentinel-alerts.tsx   # Alert list component
+│   └── dashboard/
+│       ├── financial-metrics.tsx   # Cost savings, ROI, net benefit
+│       └── business-units.tsx      # Top affected business units
+├── lib/
+│   ├── sentinel-client.ts         # Graph Security API client (OAuth2)
+│   ├── sentinel-poller.ts         # Polling service (15min interval)
+│   ├── sentinel-category-mapper.ts # Product name → category mapping
+│   ├── sentinel-config.ts         # Sentinel credential config
+│   ├── edr-data-service.ts        # Single source of truth for all alert data
+│   ├── cost-calculations.ts       # True positive filter + risk quantification
+│   └── settings-store.ts          # Platform settings (investment, credentials)
+└── types/
+    └── alerts.ts                  # SecurityAlert type definition
+```
 
-## 🔧 API Endpoints
+## Key Calculations
 
-### Analytics
-- `GET /api/analytics/rules` - Get detection rules with analytics
-- `GET /api/analytics/attack-costs` - Calculate attack costs by industry
+**True Positive Identification:**
+```
+isValid = (confidence >= 85% OR severity in [Critical, High])
+          AND (has valid MITRE ATT&CK technique with risk score >= 0.7)
+```
 
-### Alerts
-- `GET /api/alerts/realtime` - Generate real-time alerts
-- `GET /api/alerts` - List and manage alerts
+**Risk Quantification:**
+```
+totalCostImpact = SUM(truePositive.costImpact)  -- from actual alert data
+totalCostSavings = totalCostImpact - investmentAmount
+ROI = (totalCostSavings / investmentAmount) * 100
+```
 
-### Real Data Sources
-- `GET /api/real-data-sources` - Access real threat intelligence data
+No fabricated multipliers. The cost impact comes directly from the alert data.
 
-## 🎯 Key Benefits
+## API Endpoints
 
-### Real Data Integration
-- **100% Authentic Sources**: No mock data, only verified threat intelligence
-- **Source Attribution**: Proper citations and data lineage
-- **Data Quality**: Validation and freshness tracking
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/settings` | Get platform settings (secrets masked) |
+| POST | `/api/settings` | Save investment amount + Sentinel credentials |
+| POST | `/api/sentinel/test` | Test Sentinel connection with credentials |
+| GET | `/api/sentinel/status` | Connection health, alert counts per category |
+| POST | `/api/sentinel/sync` | Trigger manual sync from Sentinel |
+| POST | `/api/sentinel/webhook` | Receive pushed incidents (for Logic Apps) |
 
-### Financial Impact
-- **Real Attack Costs**: Based on documented incidents
-- **Industry-Specific**: Tailored to your sector
-- **ROI Calculation**: Quantified security investments
+## Sentinel Webhook Setup (Optional)
 
-### Enterprise Ready
-- **Production-Ready**: Scalable architecture
-- **Compliance**: Regulatory requirement mapping
-- **Audit Trail**: Complete data lineage
+For real-time ingestion (instead of waiting for the 15-min poll):
 
-## 🤝 Contributing
+1. In Sentinel, create an Automation Rule triggered on incident status change to "Resolved"
+2. Set action to call a Logic App
+3. In the Logic App, POST the incident payload to `https://your-domain/api/sentinel/webhook`
+4. Set the `x-sentinel-signature` header with HMAC-SHA256 of the body using your webhook secret
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+## Tech Stack
 
-## 📄 License
+- Next.js 15, React 19, TypeScript, Tailwind CSS
+- Radix UI / Shadcn components
+- Microsoft Graph Security API (OAuth2 client_credentials)
+- No external database required (in-memory store, PostgreSQL ready via `pg` dependency)
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+## Environment Variables
 
-## 🆘 Support
+```bash
+# Required for Sentinel connection
+SENTINEL_TENANT_ID=your-azure-ad-tenant-id
+SENTINEL_CLIENT_ID=your-app-registration-client-id
+SENTINEL_CLIENT_SECRET=your-client-secret
 
-For support and questions, please open an issue in the GitHub repository.
+# Optional
+SENTINEL_WORKSPACE_ID=your-log-analytics-workspace-id
+SENTINEL_POLLING_INTERVAL=900000
+SENTINEL_WEBHOOK_SECRET=your-hmac-secret
+```
 
+Or configure everything via the Settings page in the UI.
+
+## License
+
+MIT

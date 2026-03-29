@@ -128,8 +128,8 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-wider">SECURITY OPERATIONS DASHBOARD</h1>
-          <p className="text-sm text-neutral-400">Real-time threat detection and financial impact analysis</p>
+          <h1 className="text-2xl font-bold text-white tracking-wider">Cyber Risk Quantification Dashboard</h1>
+          <p className="text-sm text-neutral-400">Return on Cyber Investment and financial impact analysis</p>
         </div>
         <div className="flex items-center gap-2 text-xs text-neutral-400">
           <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>

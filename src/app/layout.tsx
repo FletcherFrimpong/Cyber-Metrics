@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'SignalFoundry - Tactical Operations Dashboard',
-  description: 'AI-powered cybersecurity detection platform for tactical operations',
-  keywords: 'cybersecurity, threat detection, security operations, AI, machine learning',
+  title: 'SignalFoundry - Cyber Risk Quantification Dashboard',
+  description: 'AI-powered cybersecurity Risk Quantification Platform',
+  keywords: 'cybersecurity, Cyber Metrics, security operations, AI, machine learning',
 }
 
 export default function RootLayout({
