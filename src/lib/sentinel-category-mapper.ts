@@ -3,6 +3,7 @@
 // tells us which security tool generated the alert.
 
 import type { AzureSentinelAlert } from "@/types/alerts";
+import { getIncidentCost } from "./cost-benchmarks";
 
 export type AlertCategory = "edr" | "email" | "network" | "web" | "cloud";
 
@@ -188,23 +189,16 @@ function mapSeverity(severity: string): "Low" | "Medium" | "High" | "Critical" {
   return "Medium";
 }
 
-// Extract cost impact from severity — this is the baseline.
-// With real data, customers can override this with actual incident cost fields.
-function severityCostImpact(severity: string): number {
-  switch (severity) {
-    case "Critical": return 250000;
-    case "High": return 150000;
-    case "Medium": return 75000;
-    case "Low": return 25000;
-    default: return 50000;
-  }
-}
+// Cost impact is looked up from industry benchmarks by category + severity.
+// This happens in transformSentinelAlert where we know both the category and severity.
 
 export function transformSentinelAlert(
   alert: GraphSecurityAlert,
-  incident: SentinelIncident
+  incident: SentinelIncident,
+  category?: AlertCategory
 ): AzureSentinelAlert {
   const severity = mapSeverity(alert.severity || incident.severity);
+  const resolvedCategory = category || mapProductToCategory(alert.productName || "");
 
   // Extract MITRE techniques and tactics
   const mitreTechniques = (alert.mitreTechniques || []).map(m => m.technique).filter(Boolean);
@@ -255,7 +249,7 @@ export function transformSentinelAlert(
     iocIndicators,
     affectedEntities,
     remediationSteps,
-    costImpact: severityCostImpact(severity),
+    costImpact: getIncidentCost(resolvedCategory, severity),
   };
 }
 
@@ -286,7 +280,7 @@ export function transformIncident(incident: SentinelIncident): {
       iocIndicators: [],
       affectedEntities: [],
       remediationSteps: [],
-      costImpact: severityCostImpact(severity),
+      costImpact: getIncidentCost("cloud", severity),
     };
     return [{ category: "cloud" as AlertCategory, alerts: [singleAlert] }];
   }
@@ -294,8 +288,8 @@ export function transformIncident(incident: SentinelIncident): {
   // Group alerts by category
   const grouped = new Map<AlertCategory, AzureSentinelAlert[]>();
   for (const alert of incident.alerts) {
-    const transformed = transformSentinelAlert(alert, incident);
     const category = mapProductToCategory(alert.productName || "");
+    const transformed = transformSentinelAlert(alert, incident, category);
     if (!grouped.has(category)) grouped.set(category, []);
     grouped.get(category)!.push(transformed);
   }
