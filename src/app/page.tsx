@@ -148,7 +148,8 @@ export default function HomePage() {
 
       {/* Main Content */}
       <div className={`flex-1 flex flex-col ${!sidebarCollapsed ? "md:ml-0" : ""}`}>
-        {/* Top Toolbar */}
+        {/* Top Toolbar — hidden on settings page */}
+        {activeSection !== "settings" && (
         <div className="h-16 bg-neutral-800 border-b border-neutral-700 flex items-center justify-between px-6">
           {/* Left Section */}
           <div className="flex items-center gap-6">
@@ -176,7 +177,7 @@ export default function HomePage() {
                 </Button>
               </div>
             </div>
-            
+
             {/* Quarter Selection */}
             {timeView === "quarterly" && (
               <div className="flex items-center gap-3">
@@ -195,9 +196,7 @@ export default function HomePage() {
               </div>
             )}
           </div>
-          
 
-          
           {/* Right Section */}
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" className="text-neutral-400 hover:text-orange-500">
@@ -209,6 +208,7 @@ export default function HomePage() {
             <div className="text-xs text-neutral-500 ml-8">LAST UPDATE: {lastUpdate}</div>
           </div>
         </div>
+        )}
 
         {/* Dashboard Content */}
         <div className="flex-1 overflow-auto p-6">
