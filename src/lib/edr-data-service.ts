@@ -221,6 +221,32 @@ class EDRDataService {
     };
   }
 
+  // ─── DEPARTMENT AGGREGATION ──────────────────────────────────────────────────
+  // Aggregates alerts by department for the "Top Affected Units" view.
+
+  getDepartmentBreakdown(timeframe: string): { name: string; alerts: number; costImpact: number; critical: number; high: number }[] {
+    const data = this.getTimeframeAlerts(timeframe);
+    const allAlerts = [...data.edr, ...data.email, ...data.network, ...data.web, ...data.cloud];
+
+    const deptMap = new Map<string, { alerts: number; costImpact: number; critical: number; high: number }>();
+
+    for (const alert of allAlerts) {
+      const dept = (alert as any).department || "Unattributed";
+      if (!deptMap.has(dept)) {
+        deptMap.set(dept, { alerts: 0, costImpact: 0, critical: 0, high: 0 });
+      }
+      const entry = deptMap.get(dept)!;
+      entry.alerts++;
+      entry.costImpact += alert.costImpact || 0;
+      if (alert.severity === "Critical") entry.critical++;
+      if (alert.severity === "High") entry.high++;
+    }
+
+    return Array.from(deptMap.entries())
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.costImpact - a.costImpact);
+  }
+
   // ─── GENERAL STATUS ────────────────────────────────────────────────────────
 
   getStatus() {

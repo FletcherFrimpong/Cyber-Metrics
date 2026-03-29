@@ -111,8 +111,16 @@ export class SentinelPoller {
       const incidents = await this.client.getResolvedIncidentsWithAlerts(since);
 
       for (const incident of incidents) {
+        // Resolve departments for each alert in the incident
+        const deptMap = await this.client.resolveIncidentDepartments(incident).catch(() => new Map<string, string>());
+
         const grouped = transformIncident(incident);
         for (const { category, alerts } of grouped) {
+          // Attach department to each alert
+          for (const alert of alerts) {
+            const alertId = alert.rawLog?.alertId || alert.id.replace("SENTINEL-", "");
+            alert.department = deptMap.get(alertId) || "Unattributed";
+          }
           this.onAlerts(alerts, category);
           categories[category] += alerts.length;
           newAlerts += alerts.length;

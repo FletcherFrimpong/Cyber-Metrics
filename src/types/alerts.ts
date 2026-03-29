@@ -19,6 +19,7 @@ export interface SecurityAlert {
   costImpact: number;
   confidence?: number;
   status?: "Open" | "In Progress" | "Resolved" | "False Positive";
+  department?: string;
 }
 
 // Backward-compatible aliases

@@ -52,7 +52,7 @@ Open http://localhost:3000
 1. Enter your **Security Investment** amount (annual EDR/SOC/tooling spend)
 2. Connect **Microsoft Sentinel**:
    - Create an Azure AD App Registration
-   - Add API permissions: `SecurityIncident.Read.All`, `SecurityAlert.Read.All`
+   - Add API permissions: `SecurityIncident.Read.All`, `SecurityAlert.Read.All`, `User.Read.All`, `Device.Read.All`
    - Grant admin consent
    - Enter Tenant ID, Client ID, Client Secret in Settings
    - Click "Test Connection" to verify
@@ -98,6 +98,7 @@ src/
 │   ├── edr-data-service.ts        # Single source of truth for all alert data
 │   ├── cost-calculations.ts       # True positive filter + risk quantification
 │   ├── cost-benchmarks.ts         # Industry benchmark cost matrix (IBM, FBI, Ponemon)
+│   ├── department-resolver.ts     # Azure AD user/device → department lookup with caching
 │   └── settings-store.ts          # Platform settings (investment, credentials)
 └── types/
     └── alerts.ts                  # SecurityAlert type definition
@@ -134,6 +135,18 @@ ROI = (totalCostSavings / investmentAmount) * 100
 ```
 
 Every number is traceable: benchmark cites its source, category comes from the product name, severity comes from the alert.
+
+**Department Resolution (Top Affected Units):**
+
+Departments are resolved automatically from your Azure AD — no manual mapping needed:
+
+```
+Alert evidence → userPrincipalName → GET /users/{upn}?$select=department → "Finance"
+Alert evidence → deviceName → GET /devices → registeredOwners → user department → "IT"
+No user/device → "Unattributed"
+```
+
+The resolver caches user→department mappings for 24 hours (departments rarely change). Batch lookups are used during polling to minimize API calls. Requires `User.Read.All` and `Device.Read.All` permissions.
 
 ## API Endpoints
 
