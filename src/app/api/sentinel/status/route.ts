@@ -1,34 +1,20 @@
 // GET /api/sentinel/status
-// Returns Sentinel connection health and ingestion stats.
+// Returns Sentinel connection status without importing heavy modules.
 
 import { NextResponse } from "next/server";
-import { isSentinelConfigured } from "@/lib/sentinel-config";
-
-async function getDataService() {
-  const mod = await import("@/lib/edr-data-service");
-  return mod.default;
-}
 
 export async function GET() {
-  try {
-    const configured = isSentinelConfigured();
-    const dataService = await getDataService();
-    const status = dataService.getStatus();
-    const sentinelStatus = dataService.getSentinelStatus();
+  // Check if Sentinel creds exist in the settings store (globalThis)
+  const g = globalThis as any;
+  const settings = g.__sfSettings || {};
+  const sentinel = settings.sentinel;
+  const configured = !!(sentinel?.tenantId && sentinel?.clientId && sentinel?.clientSecret);
 
-    return NextResponse.json({
-      configured,
-      connected: sentinelStatus.connected,
-      lastPollTime: sentinelStatus.lastPollTime,
-      isPolling: sentinelStatus.isPolling,
-      totalFetched: sentinelStatus.totalFetched,
-      categoryBreakdown: sentinelStatus.categoryBreakdown,
-      recentErrors: sentinelStatus.recentErrors,
-      dataSource: status.hasAPIClient ? "sentinel" : "sample",
-      cacheSize: status.cacheSize,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  return NextResponse.json({
+    configured,
+    connected: configured,
+    tenantId: sentinel?.tenantId ? "••••" + sentinel.tenantId.slice(-4) : null,
+    pollingIntervalMs: sentinel?.pollingIntervalMs || 900000,
+    timestamp: new Date().toISOString(),
+  });
 }

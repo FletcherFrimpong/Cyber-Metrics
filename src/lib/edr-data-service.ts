@@ -293,6 +293,22 @@ class EDRDataService {
   }
 }
 
-// Singleton
-const edrDataService = new EDRDataService();
+// Lazy singleton via globalThis — avoids blocking module resolution
+const g = globalThis as any;
+function getDataService(): EDRDataService {
+  if (!g.__edrDataService) {
+    g.__edrDataService = new EDRDataService();
+  }
+  return g.__edrDataService;
+}
+
+// Proxy that lazily initializes on first property access
+const edrDataService = new Proxy({} as EDRDataService, {
+  get(_target, prop) {
+    const svc = getDataService();
+    const val = (svc as any)[prop];
+    return typeof val === "function" ? val.bind(svc) : val;
+  },
+});
+
 export default edrDataService;

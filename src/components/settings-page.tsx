@@ -34,15 +34,8 @@ export default function SettingsPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [settingsRes, statusRes] = await Promise.all([
-          fetch("/api/settings"),
-          fetch("/api/sentinel/status").catch(() => null),
-        ]);
-        const settings = await settingsRes.json();
-        if (statusRes) {
-          const status = await statusRes.json();
-          setConnectionStatus(status);
-        }
+        const res = await fetch("/api/settings");
+        const settings = await res.json();
 
         setInvestmentAmount(settings.investmentAmount ? String(settings.investmentAmount) : "");
         if (settings.sentinel) {
