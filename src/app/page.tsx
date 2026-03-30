@@ -27,12 +27,17 @@ export default function HomePage() {
   };
 
   const [selectedQuarter, setSelectedQuarter] = useState<string>(getCurrentQuarter())
-  const [lastUpdate, setLastUpdate] = useState<string>(new Date().toLocaleString())
+  const [lastUpdate, setLastUpdate] = useState<string>("")
 
-  // Update timestamp when quarter or view changes (actual data reload)
+  // Update timestamp on mount and when quarter or view changes
   useEffect(() => {
     setLastUpdate(new Date().toLocaleString());
   }, [selectedQuarter, timeView, activeSection]);
+
+  // Set initial timestamp on client only (avoids hydration mismatch)
+  useEffect(() => {
+    setLastUpdate(new Date().toLocaleString());
+  }, []);
 
   const allNavItems = [
     { id: "executive-reports", icon: FileText, label: "EXECUTIVE REPORTS", permission: "reports:view" as const },
