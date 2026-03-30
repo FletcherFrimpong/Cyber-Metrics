@@ -1,50 +1,19 @@
 import { SignJWT, jwtVerify } from "jose";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { join } from "path";
-import { randomBytes } from "crypto";
 import type { SessionPayload } from "./types";
 
 const TOKEN_LIFETIME = "8h";
-const DATA_DIR = join(process.cwd(), ".data");
-const SECRET_FILE = join(DATA_DIR, ".auth-secret");
 
 /**
- * Get the JWT signing secret. Priority:
- * 1. AUTH_SECRET env var (recommended for production)
- * 2. Auto-generated secret persisted in .data/.auth-secret (dev/first-run)
- *
- * Never uses a hardcoded fallback — always unique per installation.
+ * Get the JWT signing secret from AUTH_SECRET env var.
+ * The secret is initialized in next.config.ts at startup (auto-generated
+ * if not set), so it's available in both Node and Edge runtimes.
  */
 function getSecret(): Uint8Array {
-  const envSecret = process.env.AUTH_SECRET;
-  if (envSecret) {
-    return new TextEncoder().encode(envSecret);
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) {
+    throw new Error("AUTH_SECRET is not set. Check next.config.ts initialization.");
   }
-
-  // Auto-generate and persist a secret for this installation
-  try {
-    if (existsSync(SECRET_FILE)) {
-      const saved = readFileSync(SECRET_FILE, "utf-8").trim();
-      if (saved) return new TextEncoder().encode(saved);
-    }
-  } catch {}
-
-  // Generate new secret
-  const generated = randomBytes(32).toString("base64url");
-  console.warn(
-    "[auth] AUTH_SECRET not set — auto-generated a secret. Set AUTH_SECRET in .env for production."
-  );
-
-  // Persist to disk and env so middleware (Edge Runtime) can pick it up
-  try {
-    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true });
-    writeFileSync(SECRET_FILE, generated, { encoding: "utf-8", mode: 0o600 });
-  } catch {
-    console.warn("[auth] Could not persist auto-generated secret to disk.");
-  }
-  process.env.AUTH_SECRET = generated;
-
-  return new TextEncoder().encode(generated);
+  return new TextEncoder().encode(secret);
 }
 
 export async function signToken(
@@ -67,7 +36,3 @@ export async function verifyToken(
     return null;
   }
 }
-
-// Lightweight verify for Edge Runtime (middleware) — same logic, exported separately
-// so the import path is clear.
-export { getSecret as getJwtSecret };

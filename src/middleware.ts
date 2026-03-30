@@ -11,10 +11,9 @@ const PUBLIC_PATHS = [
   "/api/auth/accept-invite",
 ];
 
-function getSecret(): Uint8Array | null {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret) return null;
-  return new TextEncoder().encode(secret);
+function getSecret(): Uint8Array {
+  // AUTH_SECRET is always set — initialized in next.config.ts at startup
+  return new TextEncoder().encode(process.env.AUTH_SECRET || "");
 }
 
 export async function middleware(request: NextRequest) {
@@ -47,17 +46,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  const secret = getSecret();
-  if (!secret) {
-    // AUTH_SECRET not initialized yet — reject token, force re-auth
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, getSecret());
 
     // Attach user info to request headers for downstream use
     const response = NextResponse.next();
