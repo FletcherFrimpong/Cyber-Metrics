@@ -19,6 +19,16 @@ export async function GET() {
           connected: !!(s.sentinel.tenantId && s.sentinel.clientId && s.sentinel.clientSecret),
         }
       : null,
+    smtp: s.smtp
+      ? {
+          host: s.smtp.host || "",
+          port: s.smtp.port || 587,
+          user: s.smtp.user || "",
+          pass: s.smtp.pass ? "••••••••" : "",
+          from: s.smtp.from || "",
+          configured: !!(s.smtp.host && s.smtp.user),
+        }
+      : null,
   });
 }
 
@@ -31,6 +41,7 @@ export async function POST(request: NextRequest) {
   const s = updateSettings({
     investmentAmount: body.investmentAmount,
     sentinel: body.sentinel,
+    smtp: body.smtp,
   });
 
   // Try to connect Sentinel if credentials are present

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, Shield, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { DollarSign, Shield, Loader2, CheckCircle, XCircle, Mail } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 
 interface SentinelFormState {
@@ -25,6 +25,8 @@ export default function SettingsPage() {
     clientSecret: "",
     workspaceId: "",
   });
+  const [smtp, setSmtp] = useState({ host: "", port: "587", user: "", pass: "", from: "" });
+  const [smtpConfigured, setSmtpConfigured] = useState(false);
   const [sentinelConnected, setSentinelConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,6 +70,16 @@ export default function SettingsPage() {
             fetchConnectionStatus();
           }
         }
+        if (settings.smtp) {
+          setSmtp({
+            host: settings.smtp.host || "",
+            port: String(settings.smtp.port || 587),
+            user: settings.smtp.user || "",
+            pass: settings.smtp.pass || "",
+            from: settings.smtp.from || "",
+          });
+          setSmtpConfigured(settings.smtp.configured || false);
+        }
       } catch (err) {
         console.error("Failed to load settings:", err);
       } finally {
@@ -93,6 +105,15 @@ export default function SettingsPage() {
                 clientId: sentinel.clientId,
                 clientSecret: sentinel.clientSecret,
                 workspaceId: sentinel.workspaceId,
+              }
+            : null,
+          smtp: smtp.host
+            ? {
+                host: smtp.host,
+                port: parseInt(smtp.port) || 587,
+                user: smtp.user,
+                pass: smtp.pass,
+                from: smtp.from,
               }
             : null,
         }),
@@ -330,6 +351,102 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SMTP / Email Configuration */}
+      <Card className="bg-neutral-900 border-neutral-800">
+        <CardHeader className="pb-4 pt-5 px-6">
+          <CardTitle className="text-base font-semibold text-neutral-200 uppercase tracking-wide flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Email / SMTP Configuration
+            {smtpConfigured && (
+              <Badge variant="outline" className="ml-2 bg-green-500/10 border-green-500/30 text-green-400 text-xs">
+                Configured
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-6 pb-6 space-y-5">
+          <p className="text-sm text-neutral-400">
+            Configure SMTP to send invite emails when adding new users.
+            Works with any SMTP provider: Gmail, Outlook, Amazon SES, SendGrid, etc.
+          </p>
+
+          {/* Gmail help */}
+          <div className="bg-neutral-800/50 border border-neutral-700/50 rounded-md p-4">
+            <p className="text-sm text-neutral-300 font-medium mb-2">Common providers:</p>
+            <div className="text-sm text-neutral-400 space-y-1">
+              <div><span className="text-neutral-300">Gmail:</span> smtp.gmail.com, port 587, use an App Password</div>
+              <div><span className="text-neutral-300">Outlook:</span> smtp.office365.com, port 587</div>
+              <div><span className="text-neutral-300">Amazon SES:</span> email-smtp.us-east-1.amazonaws.com, port 587</div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-neutral-400 mb-1.5 block">SMTP Host</label>
+                <Input
+                  placeholder="smtp.gmail.com"
+                  value={smtp.host}
+                  onChange={(e) => setSmtp((s) => ({ ...s, host: e.target.value }))}
+                  disabled={!canEdit}
+                  className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-neutral-400 mb-1.5 block">Port</label>
+                <Input
+                  type="number"
+                  placeholder="587"
+                  value={smtp.port}
+                  onChange={(e) => setSmtp((s) => ({ ...s, port: e.target.value }))}
+                  disabled={!canEdit}
+                  className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm text-neutral-400 mb-1.5 block">Username / Email</label>
+                <Input
+                  placeholder="your-email@gmail.com"
+                  value={smtp.user}
+                  onChange={(e) => setSmtp((s) => ({ ...s, user: e.target.value }))}
+                  disabled={!canEdit}
+                  className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-neutral-400 mb-1.5 block">Password / App Password</label>
+                <Input
+                  type="password"
+                  placeholder="Enter SMTP password"
+                  value={smtp.pass}
+                  onChange={(e) => setSmtp((s) => ({ ...s, pass: e.target.value }))}
+                  disabled={!canEdit}
+                  className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm text-neutral-400 mb-1.5 block">From Address <span className="text-neutral-600">(optional)</span></label>
+              <Input
+                placeholder="SignalFoundry <noreply@yourcompany.com>"
+                value={smtp.from}
+                onChange={(e) => setSmtp((s) => ({ ...s, from: e.target.value }))}
+                disabled={!canEdit}
+                className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+              />
+            </div>
+          </div>
+
+          {!smtp.host && (
+            <p className="text-sm text-neutral-500">
+              Without SMTP, user invites will show the invite link on-screen for manual sharing.
+            </p>
           )}
         </CardContent>
       </Card>
