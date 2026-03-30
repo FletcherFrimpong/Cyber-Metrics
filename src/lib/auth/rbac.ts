@@ -12,18 +12,12 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "sentinel:configure",
     "sentinel:sync",
   ],
-  analyst: [
+  viewer: [
     "dashboard:view",
     "reports:view",
     "reports:export",
     "alerts:view",
     "settings:view",
-    "sentinel:sync",
-  ],
-  viewer: [
-    "dashboard:view",
-    "reports:view",
-    "alerts:view",
   ],
 };
 
@@ -37,6 +31,5 @@ export function getPermissions(role: Role): Permission[] {
 
 export const ROLE_LABELS: Record<Role, string> = {
   admin: "Administrator",
-  analyst: "Security Analyst",
   viewer: "Viewer",
 };

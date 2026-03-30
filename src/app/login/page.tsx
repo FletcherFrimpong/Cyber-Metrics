@@ -7,10 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Shield, Loader2, Eye, EyeOff, UserPlus, LogIn } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 
+type Mode = "login" | "signup" | "setup";
+
 export default function LoginPage() {
   const router = useRouter();
   const { refresh } = useAuth();
+  const [mode, setMode] = useState<Mode>("login");
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -22,9 +26,26 @@ export default function LoginPage() {
   useEffect(() => {
     fetch("/api/auth/setup")
       .then((r) => r.json())
-      .then((data) => setNeedsSetup(data.needsSetup))
+      .then((data) => {
+        setNeedsSetup(data.needsSetup);
+        if (data.needsSetup) setMode("setup");
+      })
       .catch(() => setNeedsSetup(false));
   }, []);
+
+  function resetForm() {
+    setUsername("");
+    setPassword("");
+    setDisplayName("");
+    setEmail("");
+    setError("");
+    setShowPassword(false);
+  }
+
+  function switchMode(newMode: Mode) {
+    resetForm();
+    setMode(newMode);
+  }
 
   async function handleLogin(e: FormEvent) {
     e.preventDefault();
@@ -53,6 +74,46 @@ export default function LoginPage() {
     }
   }
 
+  async function handleSignup(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, displayName, email }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Sign up failed");
+        return;
+      }
+
+      // Auto-login after signup
+      const loginRes = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (loginRes.ok) {
+        await refresh();
+        router.push("/");
+      } else {
+        // Account created but login failed — switch to login
+        switchMode("login");
+        setError("Account created. Please sign in.");
+      }
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleSetup(e: FormEvent) {
     e.preventDefault();
     setError("");
@@ -71,7 +132,6 @@ export default function LoginPage() {
         return;
       }
 
-      // Auto-login after setup
       const loginRes = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -82,7 +142,8 @@ export default function LoginPage() {
         await refresh();
         router.push("/");
       } else {
-        setNeedsSetup(false); // Show login form
+        setNeedsSetup(false);
+        setMode("login");
       }
     } catch {
       setError("Network error. Please try again.");
@@ -98,6 +159,24 @@ export default function LoginPage() {
       </div>
     );
   }
+
+  const isSetup = mode === "setup";
+  const isSignup = mode === "signup";
+  const isLogin = mode === "login";
+
+  const heading = isSetup
+    ? "Create Admin Account"
+    : isSignup
+    ? "Create Account"
+    : "Sign In";
+
+  const subtitle = isSetup
+    ? "Set up your first administrator account to get started."
+    : isSignup
+    ? "Create a new viewer account to access the dashboard."
+    : "Enter your credentials to access the dashboard.";
+
+  const onSubmit = isSetup ? handleSetup : isSignup ? handleSignup : handleLogin;
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center px-4">
@@ -115,16 +194,36 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {/* Tab switcher — hidden during first-run setup */}
+        {!isSetup && (
+          <div className="flex mb-6 bg-neutral-900 border border-neutral-700 rounded-lg p-1">
+            <button
+              onClick={() => switchMode("login")}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                isLogin
+                  ? "bg-orange-600 text-white"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => switchMode("signup")}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                isSignup
+                  ? "bg-orange-600 text-white"
+                  : "text-neutral-400 hover:text-white"
+              }`}
+            >
+              Sign Up
+            </button>
+          </div>
+        )}
+
         {/* Card */}
         <div className="bg-neutral-900 border border-neutral-700 rounded-lg p-8">
-          <h2 className="text-white text-lg font-semibold mb-1">
-            {needsSetup ? "Create Admin Account" : "Sign In"}
-          </h2>
-          <p className="text-neutral-500 text-sm mb-6">
-            {needsSetup
-              ? "Set up your first administrator account to get started."
-              : "Enter your credentials to access the dashboard."}
-          </p>
+          <h2 className="text-white text-lg font-semibold mb-1">{heading}</h2>
+          <p className="text-neutral-500 text-sm mb-6">{subtitle}</p>
 
           {error && (
             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md text-red-400 text-sm">
@@ -132,7 +231,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={needsSetup ? handleSetup : handleLogin}>
+          <form onSubmit={onSubmit}>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-neutral-400 mb-1.5">
@@ -142,7 +241,7 @@ export default function LoginPage() {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter username"
+                  placeholder={isLogin ? "Enter username" : "Choose a username"}
                   required
                   autoFocus
                   autoComplete="username"
@@ -150,7 +249,7 @@ export default function LoginPage() {
                 />
               </div>
 
-              {needsSetup && (
+              {(isSignup || isSetup) && (
                 <>
                   <div>
                     <label className="block text-sm text-neutral-400 mb-1.5">
@@ -172,7 +271,7 @@ export default function LoginPage() {
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder="admin@company.com"
+                      placeholder={isSetup ? "admin@company.com" : "you@company.com"}
                       className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-600 focus-visible:ring-orange-500/50 focus-visible:border-orange-500"
                     />
                   </div>
@@ -188,10 +287,10 @@ export default function LoginPage() {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder={needsSetup ? "Min. 8 characters" : "Enter password"}
+                    placeholder={isLogin ? "Enter password" : "Min. 8 characters"}
                     required
-                    minLength={needsSetup ? 8 : undefined}
-                    autoComplete={needsSetup ? "new-password" : "current-password"}
+                    minLength={isLogin ? undefined : 8}
+                    autoComplete={isLogin ? "current-password" : "new-password"}
                     className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-600 pr-10 focus-visible:ring-orange-500/50 focus-visible:border-orange-500"
                   />
                   <button
@@ -216,7 +315,12 @@ export default function LoginPage() {
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
-              ) : needsSetup ? (
+              ) : isSetup ? (
+                <>
+                  <UserPlus className="w-4 h-4" />
+                  Create Admin Account
+                </>
+              ) : isSignup ? (
                 <>
                   <UserPlus className="w-4 h-4" />
                   Create Account
@@ -230,9 +334,10 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          {!needsSetup && (
+          {isSignup && (
             <p className="text-neutral-600 text-xs text-center mt-4">
-              Default credentials: admin / SignalFoundry2024!
+              New accounts are created with viewer (read-only) access.
+              An admin can upgrade your role later.
             </p>
           )}
         </div>

@@ -26,18 +26,17 @@ interface UserRecord {
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Administrator",
-  analyst: "Security Analyst",
   viewer: "Viewer",
 };
 
 const ROLE_COLORS: Record<string, string> = {
   admin: "bg-red-500/10 border-red-500/30 text-red-400",
-  analyst: "bg-blue-500/10 border-blue-500/30 text-blue-400",
   viewer: "bg-neutral-500/10 border-neutral-500/30 text-neutral-400",
 };
 
 export default function SettingsPage() {
   const { hasPermission } = useAuth();
+  const canEdit = hasPermission("settings:edit");
   const [investmentAmount, setInvestmentAmount] = useState("");
   const [sentinel, setSentinel] = useState<SentinelFormState>({
     tenantId: "",
@@ -63,9 +62,15 @@ export default function SettingsPage() {
     displayName: "",
     email: "",
     password: "",
-    role: "analyst" as "admin" | "analyst" | "viewer",
+    role: "viewer" as "admin" | "viewer",
   });
   const [userError, setUserError] = useState("");
+  const [inviteSuccess, setInviteSuccess] = useState<{
+    username: string;
+    password: string;
+    email?: string;
+    emailSent: boolean;
+  } | null>(null);
 
   const fetchConnectionStatus = async () => {
     try {
@@ -191,7 +196,7 @@ export default function SettingsPage() {
   }, []);
 
   const resetUserForm = () => {
-    setUserForm({ username: "", displayName: "", email: "", password: "", role: "analyst" });
+    setUserForm({ username: "", displayName: "", email: "", password: "", role: "viewer" });
     setEditingUser(null);
     setShowUserForm(false);
     setUserError("");
@@ -199,6 +204,7 @@ export default function SettingsPage() {
 
   const handleSaveUser = async () => {
     setUserError("");
+    setInviteSuccess(null);
     try {
       if (editingUser) {
         // Update
@@ -216,8 +222,11 @@ export default function SettingsPage() {
         });
         const data = await res.json();
         if (!res.ok) { setUserError(data.error); return; }
+        resetUserForm();
       } else {
-        // Create
+        // Create — show credentials on success
+        const savedPassword = userForm.password;
+        const savedUsername = userForm.username;
         const res = await fetch("/api/auth/users", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -225,8 +234,15 @@ export default function SettingsPage() {
         });
         const data = await res.json();
         if (!res.ok) { setUserError(data.error); return; }
+        const savedEmail = userForm.email;
+        resetUserForm();
+        setInviteSuccess({
+          username: savedUsername,
+          password: savedPassword,
+          email: savedEmail,
+          emailSent: data.emailSent ?? false,
+        });
       }
-      resetUserForm();
       fetchUsers();
     } catch (err: any) {
       setUserError(err.message);
@@ -292,6 +308,7 @@ export default function SettingsPage() {
                 placeholder="e.g. 700000"
                 value={investmentAmount}
                 onChange={(e) => setInvestmentAmount(e.target.value)}
+                disabled={!canEdit}
                 className="pl-7 bg-neutral-800 border-neutral-700 text-white text-base h-11"
               />
             </div>
@@ -346,6 +363,7 @@ export default function SettingsPage() {
                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                 value={sentinel.tenantId}
                 onChange={(e) => setSentinel((s) => ({ ...s, tenantId: e.target.value }))}
+                disabled={!canEdit}
                 className="bg-neutral-800 border-neutral-700 text-white text-base font-mono h-11"
               />
             </div>
@@ -355,6 +373,7 @@ export default function SettingsPage() {
                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                 value={sentinel.clientId}
                 onChange={(e) => setSentinel((s) => ({ ...s, clientId: e.target.value }))}
+                disabled={!canEdit}
                 className="bg-neutral-800 border-neutral-700 text-white text-base font-mono h-11"
               />
             </div>
@@ -365,6 +384,7 @@ export default function SettingsPage() {
                 placeholder="Enter client secret"
                 value={sentinel.clientSecret}
                 onChange={(e) => setSentinel((s) => ({ ...s, clientSecret: e.target.value }))}
+                disabled={!canEdit}
                 className="bg-neutral-800 border-neutral-700 text-white text-base font-mono h-11"
               />
             </div>
@@ -374,12 +394,14 @@ export default function SettingsPage() {
                 placeholder="Log Analytics workspace ID"
                 value={sentinel.workspaceId}
                 onChange={(e) => setSentinel((s) => ({ ...s, workspaceId: e.target.value }))}
+                disabled={!canEdit}
                 className="bg-neutral-800 border-neutral-700 text-white text-base font-mono h-11"
               />
             </div>
           </div>
 
           {/* Test connection */}
+          {canEdit && (
           <div className="flex items-center gap-4">
             <Button
               variant="outline"
@@ -403,6 +425,7 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
+          )}
 
           {/* Connection status */}
           {connectionStatus && connectionStatus.connected && (
@@ -447,22 +470,24 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Save button */}
-      <div className="flex items-center gap-4">
-        <Button size="lg" onClick={handleSave} disabled={saving} className="bg-orange-600 hover:bg-orange-700 text-white text-sm">
-          {saving ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            "Save Settings"
+      {/* Save button — admin only */}
+      {canEdit && (
+        <div className="flex items-center gap-4">
+          <Button size="lg" onClick={handleSave} disabled={saving} className="bg-orange-600 hover:bg-orange-700 text-white text-sm">
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Settings"
+            )}
+          </Button>
+          {saveMessage && (
+            <span className="text-sm text-green-400">{saveMessage}</span>
           )}
-        </Button>
-        {saveMessage && (
-          <span className="text-sm text-green-400">{saveMessage}</span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* User Management — Admin only */}
       {hasPermission("users:manage") && (
@@ -473,28 +498,83 @@ export default function SettingsPage() {
                 <Users className="w-5 h-5" />
                 User Management
               </CardTitle>
-              <Button
-                variant="outline"
-                onClick={() => { resetUserForm(); setShowUserForm(true); }}
-                className="text-sm"
-              >
-                <Plus className="w-4 h-4 mr-1.5" />
-                Add User
-              </Button>
+              {!showUserForm && (
+                <Button
+                  onClick={() => { resetUserForm(); setInviteSuccess(null); setShowUserForm(true); }}
+                  className="bg-orange-600 hover:bg-orange-700 text-white text-sm"
+                >
+                  <Plus className="w-4 h-4 mr-1.5" />
+                  Invite User
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="px-6 pb-6 space-y-5">
-            {/* User form */}
+            {/* Invite success banner */}
+            {inviteSuccess && (
+              <div className={`p-4 rounded-md space-y-3 ${
+                inviteSuccess.emailSent
+                  ? "bg-green-500/10 border border-green-500/20"
+                  : "bg-orange-500/10 border border-orange-500/20"
+              }`}>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className={`w-5 h-5 ${inviteSuccess.emailSent ? "text-green-400" : "text-orange-400"}`} />
+                  <p className={`text-sm font-medium ${inviteSuccess.emailSent ? "text-green-400" : "text-orange-400"}`}>
+                    {inviteSuccess.emailSent
+                      ? `Invitation sent to ${inviteSuccess.email}`
+                      : "User created successfully"}
+                  </p>
+                </div>
+
+                {inviteSuccess.emailSent ? (
+                  <p className="text-sm text-neutral-400">
+                    An email with login credentials has been sent. The user can sign in once they receive it.
+                  </p>
+                ) : (
+                  <p className="text-sm text-neutral-400">
+                    {inviteSuccess.email
+                      ? "Email could not be sent. Share these credentials manually:"
+                      : "Share these credentials with the new user:"}
+                  </p>
+                )}
+
+                <div className="bg-neutral-900 border border-neutral-700 rounded p-3 font-mono text-sm space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500">Username:</span>
+                    <span className="text-white">{inviteSuccess.username}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500">Password:</span>
+                    <span className="text-white">{inviteSuccess.password}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-neutral-500">Login URL:</span>
+                    <span className="text-orange-400">{typeof window !== "undefined" ? window.location.origin : ""}/login</span>
+                  </div>
+                </div>
+                <p className="text-xs text-neutral-500">The user should change their password after first login.</p>
+                <Button variant="ghost" size="sm" onClick={() => setInviteSuccess(null)} className="text-xs text-neutral-500">
+                  Dismiss
+                </Button>
+              </div>
+            )}
+
+            {/* Invite / Edit form */}
             {showUserForm && (
               <div className="bg-neutral-800/50 border border-neutral-700/50 rounded-md p-5 space-y-4">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-sm text-neutral-300 font-medium">
-                    {editingUser ? `Edit: ${editingUser.username}` : "New User"}
+                    {editingUser ? `Edit: ${editingUser.username}` : "Invite New User"}
                   </p>
                   <button onClick={resetUserForm} className="text-neutral-500 hover:text-neutral-300">
                     <X className="w-5 h-5" />
                   </button>
                 </div>
+                {!editingUser && (
+                  <p className="text-sm text-neutral-500">
+                    Create an account and share the credentials with the person you want to invite.
+                  </p>
+                )}
 
                 {userError && (
                   <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-sm">
@@ -502,63 +582,82 @@ export default function SettingsPage() {
                   </div>
                 )}
 
-                {!editingUser && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {!editingUser && (
+                    <div>
+                      <label className="text-sm text-neutral-400 mb-1.5 block">Username</label>
+                      <Input
+                        value={userForm.username}
+                        onChange={(e) => setUserForm((f) => ({ ...f, username: e.target.value }))}
+                        placeholder="username"
+                        className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                      />
+                    </div>
+                  )}
                   <div>
-                    <label className="text-sm text-neutral-400 mb-1.5 block">Username</label>
+                    <label className="text-sm text-neutral-400 mb-1.5 block">Display Name</label>
                     <Input
-                      value={userForm.username}
-                      onChange={(e) => setUserForm((f) => ({ ...f, username: e.target.value }))}
-                      placeholder="username"
+                      value={userForm.displayName}
+                      onChange={(e) => setUserForm((f) => ({ ...f, displayName: e.target.value }))}
+                      placeholder="Full name"
                       className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
                     />
                   </div>
-                )}
-                <div>
-                  <label className="text-sm text-neutral-400 mb-1.5 block">Display Name</label>
-                  <Input
-                    value={userForm.displayName}
-                    onChange={(e) => setUserForm((f) => ({ ...f, displayName: e.target.value }))}
-                    placeholder="Full name"
-                    className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-neutral-400 mb-1.5 block">Email</label>
-                  <Input
-                    type="email"
-                    value={userForm.email}
-                    onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
-                    placeholder="user@company.com"
-                    className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-neutral-400 mb-1.5 block">
-                    Password {editingUser && <span className="text-neutral-600">(leave blank to keep current)</span>}
-                  </label>
-                  <Input
-                    type="password"
-                    value={userForm.password}
-                    onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
-                    placeholder={editingUser ? "Leave blank to keep" : "Min. 8 characters"}
-                    className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
-                  />
+                  <div>
+                    <label className="text-sm text-neutral-400 mb-1.5 block">Email</label>
+                    <Input
+                      type="email"
+                      value={userForm.email}
+                      onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="user@company.com"
+                      className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-neutral-400 mb-1.5 block">
+                      Password {editingUser && <span className="text-neutral-600">(leave blank to keep)</span>}
+                    </label>
+                    <Input
+                      type="password"
+                      value={userForm.password}
+                      onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
+                      placeholder={editingUser ? "Leave blank to keep" : "Min. 8 characters"}
+                      className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                    />
+                  </div>
                 </div>
                 <div>
                   <label className="text-sm text-neutral-400 mb-1.5 block">Role</label>
-                  <select
-                    value={userForm.role}
-                    onChange={(e) => setUserForm((f) => ({ ...f, role: e.target.value as any }))}
-                    className="w-full bg-neutral-800 border border-neutral-700 rounded-md px-3 py-2.5 text-base text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  >
-                    <option value="admin">Administrator</option>
-                    <option value="analyst">Security Analyst</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setUserForm((f) => ({ ...f, role: "admin" }))}
+                      className={`p-3 rounded-md border text-left transition-colors ${
+                        userForm.role === "admin"
+                          ? "border-orange-500 bg-orange-500/10 text-white"
+                          : "border-neutral-700 bg-neutral-800 text-neutral-400 hover:border-neutral-600"
+                      }`}
+                    >
+                      <div className="text-sm font-medium">Administrator</div>
+                      <div className="text-xs text-neutral-500 mt-0.5">Full access, can edit settings and manage users</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUserForm((f) => ({ ...f, role: "viewer" }))}
+                      className={`p-3 rounded-md border text-left transition-colors ${
+                        userForm.role === "viewer"
+                          ? "border-orange-500 bg-orange-500/10 text-white"
+                          : "border-neutral-700 bg-neutral-800 text-neutral-400 hover:border-neutral-600"
+                      }`}
+                    >
+                      <div className="text-sm font-medium">Viewer</div>
+                      <div className="text-xs text-neutral-500 mt-0.5">Read-only access to dashboard, reports, and settings</div>
+                    </button>
+                  </div>
                 </div>
                 <div className="flex gap-3 pt-2">
                   <Button onClick={handleSaveUser} className="bg-orange-600 hover:bg-orange-700 text-white text-sm">
-                    {editingUser ? "Update User" : "Create User"}
+                    {editingUser ? "Update User" : "Send Invite"}
                   </Button>
                   <Button variant="ghost" onClick={resetUserForm} className="text-sm">
                     Cancel
@@ -622,9 +721,8 @@ export default function SettingsPage() {
             <div className="bg-neutral-800/50 border border-neutral-700/50 rounded-md p-4">
               <p className="text-sm text-neutral-300 font-medium mb-3">Role Permissions</p>
               <div className="space-y-2 text-sm text-neutral-400">
-                <div><span className="text-red-400 font-medium">Administrator</span> — Full access: dashboard, reports, alerts, settings, users, Sentinel config</div>
-                <div><span className="text-blue-400 font-medium">Security Analyst</span> — View dashboard, reports, alerts, settings. Can export reports and trigger syncs</div>
-                <div><span className="text-neutral-300 font-medium">Viewer</span> — Read-only: dashboard, reports, alerts</div>
+                <div><span className="text-red-400 font-medium">Administrator</span> — Full access: dashboard, reports, alerts, settings (edit), user management, Sentinel config</div>
+                <div><span className="text-neutral-300 font-medium">Viewer</span> — Read-only: dashboard, reports, alerts, settings (view only)</div>
               </div>
             </div>
           </CardContent>

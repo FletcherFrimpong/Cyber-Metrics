@@ -6,6 +6,7 @@ import {
   updateUser,
   deleteUser,
 } from "@/lib/auth/user-store";
+import { isEmailConfigured, sendInviteEmail } from "@/lib/email";
 
 export async function GET() {
   const auth = await requireAuth("users:manage");
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!["admin", "analyst", "viewer"].includes(role)) {
+  if (!["admin", "viewer"].includes(role)) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
 
@@ -56,7 +57,30 @@ export async function POST(request: NextRequest) {
       email: email || "",
       role,
     });
-    return NextResponse.json({ success: true, user });
+
+    // Send invite email (best-effort — doesn't block user creation)
+    let emailSent = false;
+    let emailError: string | undefined;
+
+    if (email && isEmailConfigured()) {
+      try {
+        const origin = process.env.APP_URL || new URL(request.url).origin;
+        await sendInviteEmail({
+          to: email,
+          username,
+          password,
+          displayName: displayName || username,
+          role,
+          loginUrl: `${origin}/login`,
+        });
+        emailSent = true;
+      } catch (err: any) {
+        emailError = err.message;
+        console.error("Failed to send invite email:", err.message);
+      }
+    }
+
+    return NextResponse.json({ success: true, user, emailSent, emailError });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 409 });
   }
@@ -84,7 +108,7 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  if (role && !["admin", "analyst", "viewer"].includes(role)) {
+  if (role && !["admin", "viewer"].includes(role)) {
     return NextResponse.json({ error: "Invalid role" }, { status: 400 });
   }
 

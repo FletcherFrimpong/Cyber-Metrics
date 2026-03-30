@@ -332,9 +332,8 @@ SignalFoundry uses JWT-based authentication with role-based access control. Sess
 
 | Role | Permissions |
 |------|-------------|
-| **Administrator** | Full access: dashboard, reports, alerts, settings, user management, Sentinel config |
-| **Security Analyst** | View dashboard, reports, alerts, settings. Can export reports and trigger Sentinel syncs |
-| **Viewer** | Read-only: dashboard, reports, alerts |
+| **Administrator** | Full access: dashboard, reports, alerts, settings (edit), user management, Sentinel config |
+| **Viewer** | Read-only: dashboard, reports, alerts, settings (view only, cannot edit) |
 
 ### User Management
 

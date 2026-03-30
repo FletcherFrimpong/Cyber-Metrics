@@ -16,7 +16,7 @@ interface SafeUser {
   username: string;
   displayName: string;
   email: string;
-  role: "admin" | "analyst" | "viewer";
+  role: "admin" | "viewer";
   createdAt: string;
   updatedAt: string;
 }
