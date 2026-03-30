@@ -20,8 +20,12 @@ import {
   Network,
   Server
 } from "lucide-react";
-import type { AzureSentinelAlert } from "@/types/alerts";
-import edrDataService from "@/lib/edr-data-service";
+import { 
+  AzureSentinelAlert, 
+  getTimeframeAlerts, 
+  getAlertsByCategory,
+  getAlertsBySeverity 
+} from "@/data/azure-sentinel-samples";
 
 interface AzureSentinelAlertsProps {
   selectedCategory?: string;
@@ -42,9 +46,9 @@ export default function AzureSentinelAlerts({
   const getFilteredAlerts = (): AzureSentinelAlert[] => {
     let alerts: AzureSentinelAlert[] = [];
     
-    // Get timeframe-specific alerts from data service
-    const timeframeAlerts = edrDataService.getTimeframeAlerts(timeframe);
-
+    // Get timeframe-specific alerts
+    const timeframeAlerts = getTimeframeAlerts(timeframe);
+    
     if (selectedCategory === "all") {
       alerts = [
         ...timeframeAlerts.edr,
@@ -54,8 +58,7 @@ export default function AzureSentinelAlerts({
         ...timeframeAlerts.cloud
       ];
     } else {
-      const categoryKey = selectedCategory as keyof typeof timeframeAlerts;
-      alerts = timeframeAlerts[categoryKey] || [];
+      alerts = getAlertsByCategory(selectedCategory);
     }
 
     if (selectedSeverity !== "all") {

@@ -5,6 +5,7 @@
 
 # platform settings (contains secrets)
 .signalFoundry-settings.json
+/.data/
 /.pnp
 .pnp.js
 .yarn/install-state.gz

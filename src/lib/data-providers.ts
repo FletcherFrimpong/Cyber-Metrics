@@ -1,5 +1,6 @@
 // Centralized data providers for consistent data access across components
 
+import { getTimeframeAlerts } from "@/data/azure-sentinel-samples";
 import edrDataService from "./edr-data-service";
 
 export interface DataProviderConfig {
@@ -19,9 +20,17 @@ class DataProvider {
     this.config = config;
   }
 
-  // Get alerts data from the data service
+  // Get alerts data with fallback
   async getAlerts(timeframe: string) {
-    return edrDataService.getTimeframeAlerts(timeframe);
+    try {
+      if (this.config.useRealData) {
+        return await edrDataService.getTimeframeAlerts(timeframe);
+      }
+    } catch (error) {
+      console.warn('Real data unavailable, using sample data:', error);
+    }
+    
+    return getTimeframeAlerts(timeframe);
   }
 
   // Get business unit data
@@ -50,10 +59,7 @@ class DataProvider {
     };
 
     const quarterKey = selectedQuarter.split(" ")[0];
-    if (!(quarterKey in quarterlyBusinessUnitSets)) {
-      console.warn(`Unknown quarter key "${quarterKey}", defaulting to Q1`);
-    }
-    return quarterlyBusinessUnitSets[quarterKey as keyof typeof quarterlyBusinessUnitSets] || quarterlyBusinessUnitSets["Q1"];
+    return quarterlyBusinessUnitSets[quarterKey as keyof typeof quarterlyBusinessUnitSets] || quarterlyBusinessUnitSets["Q2"];
   }
 
   // Get time-based data

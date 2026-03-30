@@ -41,8 +41,8 @@ class SecureConfigManager {
 
   private initializeEncryption(): void {
     // In production, get encryption key from secure source
-    // Never use NEXT_PUBLIC_ prefix for secrets — it exposes them to the browser
-    this.encryptionKey = process.env.ENCRYPTION_KEY;
+    this.encryptionKey = process.env.ENCRYPTION_KEY || 
+                        process.env.NEXT_PUBLIC_ENCRYPTION_KEY;
   }
 
   // Get configuration from environment variables (development)
@@ -230,6 +230,26 @@ class SecureConfigManager {
       default:
         return false;
     }
+  }
+
+  // Encrypt sensitive data
+  private encrypt(data: string): string {
+    if (!this.encryptionKey) {
+      return data; // No encryption if no key
+    }
+    
+    // Simple base64 encoding for demo - use proper encryption in production
+    return Buffer.from(data).toString('base64');
+  }
+
+  // Decrypt sensitive data
+  private decrypt(data: string): string {
+    if (!this.encryptionKey) {
+      return data; // No decryption if no key
+    }
+    
+    // Simple base64 decoding for demo - use proper decryption in production
+    return Buffer.from(data, 'base64').toString('utf-8');
   }
 
   // Clear cache

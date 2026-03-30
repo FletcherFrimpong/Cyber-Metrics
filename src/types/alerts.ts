@@ -33,3 +33,12 @@ export interface CategorizedAlerts {
   web: SecurityAlert[];
   cloud: SecurityAlert[];
 }
+
+export interface EDRQueryParams {
+  startTime?: string;
+  endTime?: string;
+  severity?: string[];
+  category?: string[];
+  limit?: number;
+  offset?: number;
+}

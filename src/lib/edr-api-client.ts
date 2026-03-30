@@ -148,16 +148,13 @@ class EDRAPIClient {
 
   private async getCrowdStrikeAlerts(params: EDRQueryParams): Promise<EDRAlert[]> {
     const queryParams = new URLSearchParams();
-
-    // CrowdStrike expects a single combined filter parameter
-    const filters: string[] = [];
-    if (params.startTime) filters.push(`created_timestamp:>='${params.startTime}'`);
-    if (params.endTime) filters.push(`created_timestamp:<='${params.endTime}'`);
+    
+    if (params.startTime) queryParams.append('filter', `created_timestamp:>='${params.startTime}'`);
+    if (params.endTime) queryParams.append('filter', `created_timestamp:<='${params.endTime}'`);
     if (params.severity?.length) {
-      const severityFilter = params.severity.map(s => `severity:'${s}'`).join(',');
-      filters.push(severityFilter);
+      const severityFilter = params.severity.map(s => `severity:'${s}'`).join('+');
+      queryParams.append('filter', severityFilter);
     }
-    if (filters.length > 0) queryParams.append('filter', filters.join('+'));
     if (params.limit) queryParams.append('limit', params.limit.toString());
     if (params.offset) queryParams.append('offset', params.offset.toString());
 
@@ -178,12 +175,9 @@ class EDRAPIClient {
 
   private async getMicrosoftDefenderAlerts(params: EDRQueryParams): Promise<EDRAlert[]> {
     const queryParams = new URLSearchParams();
-
-    // Microsoft Graph API expects a single $filter with 'and' combinators
-    const filters: string[] = [];
-    if (params.startTime) filters.push(`createdDateTime ge ${params.startTime}`);
-    if (params.endTime) filters.push(`createdDateTime le ${params.endTime}`);
-    if (filters.length > 0) queryParams.append('$filter', filters.join(' and '));
+    
+    if (params.startTime) queryParams.append('$filter', `createdDateTime ge ${params.startTime}`);
+    if (params.endTime) queryParams.append('$filter', `createdDateTime le ${params.endTime}`);
     if (params.limit) queryParams.append('$top', params.limit.toString());
 
     const response = await fetch(`https://graph.microsoft.com/v1.0/security/alerts?${queryParams}`, {
