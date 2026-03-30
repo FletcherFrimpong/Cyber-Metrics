@@ -14,7 +14,10 @@ const PUBLIC_PATHS = [
 function getSecret(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
   if (!secret) {
-    return new TextEncoder().encode("sf-dev-secret-change-me-in-production");
+    // In development, the jwt.ts module auto-generates and sets AUTH_SECRET.
+    // If middleware runs before that, redirect to login (session will be
+    // validated on the next request after the secret is initialized).
+    return new TextEncoder().encode("__uninitialized__");
   }
   return new TextEncoder().encode(secret);
 }

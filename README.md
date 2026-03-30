@@ -49,14 +49,13 @@ Open http://localhost:3000
 
 ### 2. Log in
 
-On first launch, a default admin account is created automatically:
+On first launch, a default admin account is created with a **randomly generated password**. Find the credentials in:
 
-| Field | Value |
-|-------|-------|
-| Username | `admin` |
-| Password | `SignalFoundry2024!` |
+```
+.data/initial-credentials.txt
+```
 
-**Change the default password immediately** via Settings > User Management.
+This file is created on the server — check it after first startup, log in, then **delete the file**.
 
 For production, set the `AUTH_SECRET` environment variable:
 ```bash
@@ -65,6 +64,8 @@ openssl rand -base64 32
 # Add to .env
 AUTH_SECRET=your-generated-secret
 ```
+
+If `AUTH_SECRET` is not set, a unique secret is auto-generated per installation and persisted to `.data/.auth-secret`. This is safe for development but in production you should set it explicitly in `.env`.
 
 ### 3. Configure (Settings page)
 

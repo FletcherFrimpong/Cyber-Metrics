@@ -6,9 +6,7 @@ import { hashPassword } from "./password";
 
 const DATA_DIR = join(process.cwd(), ".data");
 const USERS_FILE = join(DATA_DIR, "users.json");
-
-const DEFAULT_ADMIN_USERNAME = "admin";
-const DEFAULT_ADMIN_PASSWORD = "SignalFoundry2024!";
+const INIT_CREDS_FILE = join(DATA_DIR, "initial-credentials.txt");
 
 function ensureDataDir() {
   if (!existsSync(DATA_DIR)) {
@@ -237,19 +235,50 @@ export async function acceptInvite(data: {
 
 /**
  * Seed a default admin account if no users exist.
- * Called on first server access.
+ * Generates a random password and writes it to .data/initial-credentials.txt
+ * so the admin can read it from the server. Never hardcoded in source.
  */
 export async function seedDefaultAdmin(): Promise<void> {
   if (hasAnyUsers()) return;
 
-  console.log(
-    `[auth] No users found — creating default admin (username: ${DEFAULT_ADMIN_USERNAME})`
-  );
+  const password = randomBytes(16).toString("base64url"); // ~22 char random password
+
+  console.log("[auth] No users found — creating default admin account.");
+  console.log(`[auth] Default credentials written to: ${INIT_CREDS_FILE}`);
+
   await createUser({
-    username: DEFAULT_ADMIN_USERNAME,
-    password: DEFAULT_ADMIN_PASSWORD,
+    username: "admin",
+    password,
     displayName: "Administrator",
-    email: "admin@signalfoundry.local",
+    email: "",
     role: "admin",
   });
+
+  // Write credentials to a file (server-side only, gitignored via .data/)
+  try {
+    ensureDataDir();
+    writeFileSync(
+      INIT_CREDS_FILE,
+      [
+        "SignalFoundry — Initial Admin Credentials",
+        "==========================================",
+        "",
+        `Username: admin`,
+        `Password: ${password}`,
+        "",
+        "Login at: http://localhost:3000/login",
+        "",
+        "IMPORTANT: Change this password immediately after first login.",
+        "Delete this file after you have logged in.",
+        "",
+        `Generated: ${new Date().toISOString()}`,
+      ].join("\n"),
+      "utf-8"
+    );
+  } catch (err) {
+    // If file write fails, log to console as fallback
+    console.log(`[auth] Username: admin`);
+    console.log(`[auth] Password: ${password}`);
+    console.log("[auth] Change this password immediately after login.");
+  }
 }
