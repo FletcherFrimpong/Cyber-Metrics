@@ -77,12 +77,34 @@ AUTH_SECRET=your-generated-secret
    - Click "Test Connection" to verify
    - Click "Save Settings" to start ingesting
 
-### 4. Data starts flowing
+### 4. Configure Email (Settings page, optional)
+
+To enable email invitations for new users, configure SMTP in **Settings > Email / SMTP Configuration**:
+
+| Provider | Host | Port |
+|----------|------|------|
+| Gmail | `smtp.gmail.com` | 587 |
+| Outlook | `smtp.office365.com` | 587 |
+| Amazon SES | `email-smtp.us-east-1.amazonaws.com` | 587 |
+
+Without SMTP, user invites still work — the invite link is shown on-screen for manual sharing.
+
+### 5. Invite Users (User Management in sidebar)
+
+Admins invite users from **User Management** in the sidebar:
+1. Click **"Invite User"** → enter email + role (Admin or Viewer)
+2. User receives an email with an invite link (or admin copies the link manually)
+3. User clicks the link, chooses their own username and password
+4. Account activates — they appear in the user list with their role
+
+New users can also self-register via the **Sign Up** tab on the login page (creates viewer accounts).
+
+### 6. Data starts flowing
 
 SignalFoundry polls Sentinel every 15 minutes for resolved incidents. Each incident's alerts are:
 - Categorized by product name (EDR, Email, Network, Web, Cloud)
-- Validated against MITRE ATT&CK techniques (36 techniques, risk scoring)
-- Filtered for true positives (confidence >= 85% or Critical/High severity + valid MITRE)
+- Validated against MITRE ATT&CK techniques (200+ techniques, risk scoring)
+- Filtered for true positives (MITRE + confidence, high severity, or high confidence)
 - Cost impact summed from validated alerts
 
 ## Architecture
@@ -158,7 +180,7 @@ SignalFoundry polls Sentinel every 15 minutes for resolved incidents. Each incid
                     │   │ Auth & Middleware  │                           │
                     │   │                   │                           │
                     │   │ • JWT sessions    │                           │
-                    │   │ • RBAC (3 roles)  │                           │
+                    │   │ • RBAC (2 roles)  │                           │
                     │   │ • Rate limiting   │                           │
                     │   │ • File-backed     │                           │
                     │   │   user store      │                           │
@@ -169,9 +191,10 @@ SignalFoundry polls Sentinel every 15 minutes for resolved incidents. Each incid
                     │   FRONTEND (React 19 / Next.js App Router)        │
                     │                                                    │
                     │  ┌──────────────────────────────────────────────┐  │
-                    │  │ Login Screen                                 │  │
-                    │  │ • First-run setup detection                  │  │
-                    │  │ • JWT cookie auth                            │  │
+                    │  │ Login / Sign Up / Invite Accept               │  │
+                    │  │ • First-run admin setup                       │  │
+                    │  │ • Sign In / Sign Up tabs                      │  │
+                    │  │ • /invite?token=xxx (set own password)        │  │
                     │  └──────────────────────────────────────────────┘  │
                     │                                                    │
                     │  ┌──────────────────────────────────────────────┐  │
@@ -186,12 +209,13 @@ SignalFoundry polls Sentinel every 15 minutes for resolved incidents. Each incid
                     │  │  │ • Cost data │  │ • KRI metrics        │  │  │
                     │  │  └─────────────┘  │ • PDF export         │  │  │
                     │  │                   └──────────────────────┘  │  │
-                    │  │  ┌──────────────────────────────────────┐   │  │
-                    │  │  │ Settings (admin)                     │   │  │
-                    │  │  │ • Investment config                  │   │  │
-                    │  │  │ • Sentinel credentials               │   │  │
-                    │  │  │ • User management (CRUD + RBAC)      │   │  │
-                    │  │  └──────────────────────────────────────┘   │  │
+                    │  │  ┌─────────────────┐  ┌─────────────────┐  │  │
+                    │  │  │ User Management │  │ Settings        │  │  │
+                    │  │  │ (admin only)    │  │                 │  │  │
+                    │  │  │ • Invite users  │  │ • Investment    │  │  │
+                    │  │  │ • Edit/delete   │  │ • Sentinel      │  │  │
+                    │  │  │ • Role assign   │  │ • SMTP email    │  │  │
+                    │  │  └─────────────────┘  └─────────────────┘  │  │
                     │  └──────────────────────────────────────────────┘  │
                     └───────────────────────────────────────────────────┘
 ```
@@ -223,18 +247,22 @@ When Sentinel is not connected, the dashboard automatically loads sample data fo
 src/
 ├── app/
 │   ├── page.tsx                    # Main dashboard with sidebar navigation
-│   ├── login/page.tsx              # Login screen with first-run setup
+│   ├── login/page.tsx              # Login + Sign Up screen
+│   ├── invite/page.tsx             # Invite acceptance (set username + password)
 │   ├── dashboard/                  # Executive summary + business units
 │   ├── executive-reports/          # Detailed security tool metrics
 │   ├── azure-sentinel-alerts/      # Alert browser with filtering
 │   └── api/
-│       ├── auth/                   # Authentication endpoints
+│       ├── auth/
 │       │   ├── login/              # POST - authenticate credentials
 │       │   ├── logout/             # POST - clear session
+│       │   ├── signup/             # POST - self-register as viewer
 │       │   ├── me/                 # GET - current user + permissions
 │       │   ├── setup/              # GET/POST - first-run admin creation
+│       │   ├── invite/             # POST - admin sends invite (email + role)
+│       │   ├── accept-invite/      # GET/POST - validate token, set password
 │       │   └── users/              # CRUD - user management (admin only)
-│       ├── settings/               # GET/POST platform settings
+│       ├── settings/               # GET/POST platform settings (investment, Sentinel, SMTP)
 │       ├── metrics/                # GET - cost metrics + ROI calculations
 │       ├── sentinel/
 │       │   ├── webhook/            # POST - receive pushed incidents
@@ -245,19 +273,21 @@ src/
 ├── components/
 │   ├── auth-provider.tsx           # React auth context + useAuth() hook
 │   ├── trends-analytics.tsx        # Main analytics dashboard with PDF export
-│   ├── settings-page.tsx           # Investment + Sentinel + user management
+│   ├── user-management.tsx         # Invite users, edit/delete, role assignment
+│   ├── settings-page.tsx           # Investment + Sentinel + SMTP config
 │   └── dashboard/
 │       ├── financial-metrics.tsx   # Cost savings, ROI, net benefit
 │       └── business-units.tsx      # Top affected business units
 ├── lib/
 │   ├── auth/                      # Authentication & RBAC system
 │   │   ├── types.ts               # Role, User, Session, Permission types
-│   │   ├── rbac.ts                # Permission map (admin/analyst/viewer)
+│   │   ├── rbac.ts                # Permission map (admin/viewer)
 │   │   ├── password.ts            # bcrypt hashing (12 salt rounds)
 │   │   ├── jwt.ts                 # JWT sign/verify (jose, Edge-compatible)
-│   │   ├── user-store.ts          # File-backed user store (.data/users.json)
+│   │   ├── user-store.ts          # File-backed user store + invite tokens
 │   │   ├── session.ts             # HttpOnly cookie session (8h expiry)
 │   │   └── api-guard.ts           # requireAuth() wrapper for API routes
+│   ├── email.ts                   # Nodemailer SMTP invite emails
 │   ├── sentinel-client.ts         # Graph Security API client (OAuth2)
 │   ├── sentinel-poller.ts         # Polling service (15min interval)
 │   ├── sentinel-category-mapper.ts # Product name → category mapping (80+ products)
@@ -266,7 +296,7 @@ src/
 │   ├── cost-calculations.ts       # True positive filter + MITRE (200+ techniques)
 │   ├── cost-benchmarks.ts         # Industry benchmark cost matrix (IBM, FBI, Ponemon)
 │   ├── department-resolver.ts     # Azure AD user/device → department (24h cache)
-│   ├── settings-store.ts          # Persistent settings store (file-backed)
+│   ├── settings-store.ts          # Persistent settings (investment, Sentinel, SMTP)
 │   └── pdf-export.ts              # PDF report generation
 ├── data/
 │   └── azure-sentinel-samples.ts  # Sample data generator (fallback only)
@@ -335,9 +365,29 @@ SignalFoundry uses JWT-based authentication with role-based access control. Sess
 | **Administrator** | Full access: dashboard, reports, alerts, settings (edit), user management, Sentinel config |
 | **Viewer** | Read-only: dashboard, reports, alerts, settings (view only, cannot edit) |
 
-### User Management
+### User Invite Flow
 
-Admins can create, edit, and delete users via **Settings > User Management**. Users are stored in `.data/users.json`.
+1. Admin clicks **"Invite User"** in the **User Management** sidebar section
+2. Enters the user's **email** and selects a **role** (Admin or Viewer)
+3. System generates a secure invite token (72-hour expiry)
+4. If SMTP is configured: an email with a branded invite link is sent
+5. If no SMTP: the invite link is shown on-screen for manual sharing
+6. User clicks the link → `/invite?token=xxx` → sets their own **username and password**
+7. Account activates and user is auto-logged in
+
+Users can also self-register via the **Sign Up** tab on the login page (creates viewer accounts).
+
+Pending invites show a yellow "Pending" badge in the user list until accepted.
+
+### Settings Page (3 sections)
+
+| Section | Description |
+|---------|-------------|
+| **Security Investment** | Annual spend (EDR/SOC/tooling) for ROI calculations |
+| **Microsoft Sentinel** | Tenant ID, Client ID, Client Secret for Graph API |
+| **Email / SMTP** | Host, port, user, password, from address for invite emails |
+
+All configurable from the UI. Viewers see settings read-only. SMTP can also be set via env vars.
 
 ## API Endpoints
 
@@ -347,11 +397,14 @@ Admins can create, edit, and delete users via **Settings > User Management**. Us
 |--------|----------|-------------|------|
 | POST | `/api/auth/login` | Authenticate with username/password | Public |
 | POST | `/api/auth/logout` | Clear session cookie | Public |
+| POST | `/api/auth/signup` | Self-register as viewer | Public |
 | GET | `/api/auth/me` | Get current user + permissions | Authenticated |
 | GET | `/api/auth/setup` | Check if first-run setup needed | Public |
 | POST | `/api/auth/setup` | Create first admin account | Public (only when no users exist) |
+| POST | `/api/auth/invite` | Send invite (email + role) | Admin |
+| GET | `/api/auth/accept-invite?token=` | Validate invite token | Public |
+| POST | `/api/auth/accept-invite` | Accept invite (set username + password) | Public |
 | GET | `/api/auth/users` | List all users | Admin |
-| POST | `/api/auth/users` | Create user | Admin |
 | PUT | `/api/auth/users` | Update user | Admin |
 | DELETE | `/api/auth/users?id=` | Delete user | Admin |
 
@@ -379,29 +432,39 @@ For real-time ingestion (instead of waiting for the 15-min poll):
 
 ## Tech Stack
 
-- Next.js 15, React 19, TypeScript, Tailwind CSS
-- Radix UI / Shadcn components
-- Microsoft Graph Security API (OAuth2 client_credentials)
-- Settings persisted to disk (`.data/settings.json`), alerts re-fetched from Sentinel on restart
+- **Framework**: Next.js 16, React 19, TypeScript, Tailwind CSS 4
+- **UI**: Radix UI / Shadcn components, Lucide icons
+- **Auth**: JWT (jose) + bcryptjs, HttpOnly cookies, RBAC (admin/viewer)
+- **Email**: Nodemailer (any SMTP provider)
+- **SIEM**: Microsoft Graph Security API (OAuth2 client_credentials)
+- **Data**: In-memory alert store + file-backed settings (`.data/`), alerts re-fetched from Sentinel on restart
 
 ## Environment Variables
+
+All settings below can also be configured from the **Settings** page in the UI (persisted to `.data/settings.json`).
 
 ```bash
 # Authentication (required in production)
 AUTH_SECRET=your-secure-random-secret    # openssl rand -base64 32
 
-# Required for Sentinel connection
+# Sentinel connection (or configure via Settings UI)
 SENTINEL_TENANT_ID=your-azure-ad-tenant-id
 SENTINEL_CLIENT_ID=your-app-registration-client-id
 SENTINEL_CLIENT_SECRET=your-client-secret
+SENTINEL_WORKSPACE_ID=your-log-analytics-workspace-id     # optional
+SENTINEL_POLLING_INTERVAL=900000                           # optional, default 15min
+SENTINEL_WEBHOOK_SECRET=your-hmac-secret                   # optional
 
-# Optional
-SENTINEL_WORKSPACE_ID=your-log-analytics-workspace-id
-SENTINEL_POLLING_INTERVAL=900000
-SENTINEL_WEBHOOK_SECRET=your-hmac-secret
+# SMTP for email invitations (or configure via Settings UI)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+SMTP_FROM="SignalFoundry <noreply@yourcompany.com>"        # optional
+
+# Override login URL in invite emails (useful behind reverse proxy)
+APP_URL=https://signalfoundry.yourcompany.com              # optional
 ```
-
-Or configure everything via the Settings page in the UI.
 
 ## License
 
