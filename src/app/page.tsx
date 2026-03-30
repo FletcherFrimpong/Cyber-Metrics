@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronRight, Target, RefreshCw, FileText, AlertTriangle, Calendar, BarChart3, Settings, LogOut, User } from "lucide-react"
+import { ChevronRight, Target, RefreshCw, FileText, AlertTriangle, Calendar, BarChart3, Settings, LogOut, User, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import TrendsAnalytics from "@/components/trends-analytics"
 import { TacticalDashboardLayout } from "@/components/tactical-dashboard-layout"
 import SettingsPage from "@/components/settings-page"
+import UserManagement from "@/components/user-management"
 import ErrorBoundary from "@/components/debug-error-boundary"
 import { useAuth } from "@/components/auth-provider"
 
@@ -36,6 +37,7 @@ export default function HomePage() {
   const allNavItems = [
     { id: "executive-reports", icon: FileText, label: "EXECUTIVE REPORTS", permission: "reports:view" as const },
     { id: "trends-analytics", icon: Target, label: "TRENDS & ANALYTICS", permission: "dashboard:view" as const },
+    { id: "user-management", icon: Users, label: "USER MANAGEMENT", permission: "users:manage" as const },
     { id: "settings", icon: Settings, label: "SETTINGS", permission: "settings:view" as const },
   ]
 
@@ -79,6 +81,10 @@ export default function HomePage() {
 
     if (activeSection === "executive-reports") {
       return <TacticalDashboardLayout selectedQuarter={selectedQuarter} timeView={timeView} />
+    }
+
+    if (activeSection === "user-management") {
+      return <UserManagement />
     }
 
     if (activeSection === "settings") {
@@ -166,7 +172,7 @@ export default function HomePage() {
       {/* Main Content */}
       <div className={`flex-1 flex flex-col ${!sidebarCollapsed ? "md:ml-0" : ""}`}>
         {/* Top Toolbar — hidden on settings page */}
-        {activeSection !== "settings" && (
+        {activeSection !== "settings" && activeSection !== "user-management" && (
         <div className="h-16 bg-neutral-800 border-b border-neutral-700 flex items-center justify-between px-6">
           {/* Left Section */}
           <div className="flex items-center gap-6">

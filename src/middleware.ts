@@ -3,10 +3,12 @@ import { jwtVerify } from "jose";
 
 const PUBLIC_PATHS = [
   "/login",
+  "/invite",
   "/api/auth/login",
   "/api/auth/logout",
   "/api/auth/setup",
   "/api/auth/signup",
+  "/api/auth/accept-invite",
 ];
 
 function getSecret(): Uint8Array {

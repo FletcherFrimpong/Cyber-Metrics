@@ -1,4 +1,5 @@
 export type Role = "admin" | "viewer";
+export type UserStatus = "active" | "pending";
 
 export interface User {
   id: string;
@@ -7,11 +8,14 @@ export interface User {
   email: string;
   passwordHash: string;
   role: Role;
+  status: UserStatus;
+  inviteToken?: string;
+  inviteTokenExpiry?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export type SafeUser = Omit<User, "passwordHash">;
+export type SafeUser = Omit<User, "passwordHash" | "inviteToken" | "inviteTokenExpiry">;
 
 export interface SessionPayload {
   userId: string;
