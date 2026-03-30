@@ -2,6 +2,8 @@
 
 SignalFoundry connects to your Microsoft Sentinel SIEM and quantifies the financial impact of your security operations. It pulls resolved incidents, identifies true positives using MITRE ATT&CK validation, and calculates the actual cyber risk your security tools are preventing.
 
+![SignalFoundry Login Screen](docs/login-screen.png)
+
 ## How It Works
 
 ```
