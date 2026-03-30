@@ -3,8 +3,7 @@
 // Connects to Microsoft Sentinel to pull resolved incidents.
 // All consumers (cost-calculations, dashboard, trends) go through this service.
 
-import type { SecurityAlert, CategorizedAlerts } from "@/types/alerts";
-import type { EDRQueryParams } from "./edr-api-client";
+import type { SecurityAlert, CategorizedAlerts, EDRQueryParams } from "@/types/alerts";
 
 export type { CategorizedAlerts } from "@/types/alerts";
 
@@ -21,6 +20,10 @@ class EDRDataService {
   private sentinelAlertCount = 0;
   private lastIngestTime: string | null = null;
 
+  // Sample data — loaded once, used as fallback until real data arrives
+  private usingSampleData = false;
+  private sampleDataLoaded = false;
+
   // Cache for getAlerts() queries
   private cache: Map<string, { data: SecurityAlert[]; timestamp: number }> = new Map();
   private cacheDuration = 5 * 60 * 1000; // 5 minutes
@@ -34,7 +37,8 @@ class EDRDataService {
   private async initializeSentinel(): Promise<void> {
     // Check env vars directly — avoid importing config module at top level
     if (!process.env.SENTINEL_TENANT_ID || !process.env.SENTINEL_CLIENT_ID || !process.env.SENTINEL_CLIENT_SECRET) {
-      console.log("No Sentinel configured. Connect your SIEM to start ingesting alerts.");
+      console.log("No Sentinel configured — loading sample data for demonstration.");
+      this.loadSampleData();
       return;
     }
 
@@ -43,7 +47,10 @@ class EDRDataService {
     const { SentinelPoller } = await import("./sentinel-poller");
 
     const config = getSentinelConfig();
-    if (!config) return;
+    if (!config) {
+      this.loadSampleData();
+      return;
+    }
 
     console.log("Sentinel configured — starting poller");
     this.sentinelConnected = true;
@@ -53,6 +60,63 @@ class EDRDataService {
     });
 
     this.poller.start();
+  }
+
+  // ─── SAMPLE DATA FALLBACK ──────────────────────────────────────────────────
+  // Loads demonstration data so the dashboard isn't empty before Sentinel connects.
+  // Automatically replaced by real data when connectSentinel() is called.
+
+  private loadSampleData(): void {
+    if (this.sampleDataLoaded) return;
+
+    try {
+      // Dynamic import to avoid bundling sample data when not needed
+      const { generateTimeframeAlerts } = require("@/data/azure-sentinel-samples");
+
+      // Generate sample alerts for the current and previous 3 quarters
+      const now = new Date();
+      const currentQ = Math.floor(now.getMonth() / 3) + 1;
+      const currentY = now.getFullYear();
+
+      for (let i = 3; i >= 0; i--) {
+        let q = currentQ - i;
+        let y = currentY;
+        if (q <= 0) { q += 4; y -= 1; }
+
+        const timeframe = `Q${q} ${y}`;
+        const alerts = generateTimeframeAlerts(timeframe);
+
+        // Distribute sample alerts across categories
+        for (const alert of alerts) {
+          let category: AlertCategory = "edr"; // default
+          const cat = (alert.category || "").toLowerCase();
+          if (cat.includes("phish") || cat.includes("email") || cat.includes("spam")) category = "email";
+          else if (cat.includes("network") || cat.includes("firewall") || cat.includes("lateral")) category = "network";
+          else if (cat.includes("web") || cat.includes("waf") || cat.includes("injection")) category = "web";
+          else if (cat.includes("cloud") || cat.includes("azure") || cat.includes("aws")) category = "cloud";
+
+          this.sentinelAlerts[category].push(alert as SecurityAlert);
+        }
+      }
+
+      this.sentinelAlertCount = Object.values(this.sentinelAlerts).reduce((sum, arr) => sum + arr.length, 0);
+      this.usingSampleData = true;
+      this.sampleDataLoaded = true;
+      this.lastIngestTime = new Date().toISOString();
+      console.log(`Sample data loaded: ${this.sentinelAlertCount} alerts across 4 quarters`);
+    } catch (err) {
+      console.warn("Failed to load sample data:", err);
+    }
+  }
+
+  // Clears sample data when real data source connects
+  private clearSampleData(): void {
+    if (!this.usingSampleData) return;
+    this.sentinelAlerts = { edr: [], email: [], network: [], web: [], cloud: [] };
+    this.sentinelAlertCount = 0;
+    this.usingSampleData = false;
+    this.cache.clear();
+    console.log("Sample data cleared — switching to real Sentinel data");
   }
 
   // ─── ALERT INGESTION (from poller or webhook) ──────────────────────────────
@@ -79,7 +143,14 @@ class EDRDataService {
       return this.getSentinelAlertsForTimeframe(timeframe);
     }
 
-    // No data ingested yet — return empty categories
+    // No data at all — try loading sample data as fallback
+    if (!this.sampleDataLoaded) {
+      this.loadSampleData();
+      if (this.sentinelAlertCount > 0) {
+        return this.getSentinelAlertsForTimeframe(timeframe);
+      }
+    }
+
     return { edr: [], email: [], network: [], web: [], cloud: [] };
   }
 
@@ -159,6 +230,9 @@ class EDRDataService {
       console.log("Sentinel disconnected — missing credentials");
       return;
     }
+
+    // Clear sample data — real data is coming
+    this.clearSampleData();
 
     const { SentinelPoller } = await import("./sentinel-poller");
 
@@ -252,8 +326,8 @@ class EDRDataService {
   getStatus() {
     return {
       hasAPIClient: this.sentinelConnected,
-      useRealData: this.sentinelConnected,
-      fallbackToSampleData: false,
+      useRealData: this.sentinelConnected && !this.usingSampleData,
+      usingSampleData: this.usingSampleData,
       cacheSize: this.cache.size,
       sentinelAlertCount: this.sentinelAlertCount,
       lastIngestTime: this.lastIngestTime,
@@ -267,6 +341,18 @@ class EDRDataService {
   // ─── HELPERS ───────────────────────────────────────────────────────────────
 
   private parseTimeframe(timeframe: string): { startTime: string; endTime: string } {
+    if (!timeframe) {
+      // Default to current quarter
+      const now = new Date();
+      const cq = Math.floor(now.getMonth() / 3) + 1;
+      const cy = now.getFullYear();
+      const sm = (cq - 1) * 3;
+      return {
+        startTime: new Date(cy, sm, 1).toISOString(),
+        endTime: new Date(cy, sm + 3, 0, 23, 59, 59).toISOString(),
+      };
+    }
+
     const yearMatch = timeframe.match(/(\d{4})/);
     const quarterMatch = timeframe.match(/Q(\d)/);
 

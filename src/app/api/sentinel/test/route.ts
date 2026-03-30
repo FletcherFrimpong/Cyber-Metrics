@@ -2,8 +2,12 @@
 // Tests Sentinel connection with provided credentials (without saving them).
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth, isAuthError } from "@/lib/auth/api-guard";
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth("sentinel:configure");
+  if (isAuthError(auth)) return auth;
+
   try {
     const body = await request.json();
     const { tenantId, clientId, clientSecret } = body;

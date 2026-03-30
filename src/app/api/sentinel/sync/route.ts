@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { isSentinelConfigured } from "@/lib/sentinel-config";
+import { requireAuth, isAuthError } from "@/lib/auth/api-guard";
 
 async function getDataService() {
   const mod = await import("@/lib/edr-data-service");
@@ -10,6 +11,9 @@ async function getDataService() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth("sentinel:sync");
+  if (isAuthError(auth)) return auth;
+
   try {
     if (!isSentinelConfigured()) {
       return NextResponse.json({ error: "Sentinel not configured" }, { status: 503 });

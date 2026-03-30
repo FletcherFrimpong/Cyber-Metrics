@@ -1,15 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronRight, Target, RefreshCw, FileText, AlertTriangle, Calendar, BarChart3, Settings } from "lucide-react"
+import { ChevronRight, Target, RefreshCw, FileText, AlertTriangle, Calendar, BarChart3, Settings, LogOut, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import TrendsAnalytics from "@/components/trends-analytics"
 import { TacticalDashboardLayout } from "@/components/tactical-dashboard-layout"
 import SettingsPage from "@/components/settings-page"
 import ErrorBoundary from "@/components/debug-error-boundary"
+import { useAuth } from "@/components/auth-provider"
 
 
 export default function HomePage() {
+  const { user, hasPermission, logout } = useAuth()
   const [activeSection, setActiveSection] = useState("trends-analytics")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [timeView, setTimeView] = useState<"quarterly" | "yearly">("quarterly")
@@ -31,11 +33,13 @@ export default function HomePage() {
     setLastUpdate(new Date().toLocaleString());
   }, [selectedQuarter, timeView, activeSection]);
 
-  const navItems = [
-    { id: "executive-reports", icon: FileText, label: "EXECUTIVE REPORTS" },
-    { id: "trends-analytics", icon: Target, label: "TRENDS & ANALYTICS" },
-    { id: "settings", icon: Settings, label: "SETTINGS" },
+  const allNavItems = [
+    { id: "executive-reports", icon: FileText, label: "EXECUTIVE REPORTS", permission: "reports:view" as const },
+    { id: "trends-analytics", icon: Target, label: "TRENDS & ANALYTICS", permission: "dashboard:view" as const },
+    { id: "settings", icon: Settings, label: "SETTINGS", permission: "settings:view" as const },
   ]
+
+  const navItems = allNavItems.filter((item) => hasPermission(item.permission))
 
   // Generate quarterly data dynamically based on current date - Show only current 4 quarters
   const generateQuarterlyData = () => {
@@ -130,12 +134,25 @@ export default function HomePage() {
           {!sidebarCollapsed && (
             <div className="mt-8 p-4 bg-neutral-800 border border-neutral-700 rounded">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                 <span className="text-xs text-white">SYSTEM ONLINE</span>
               </div>
-              <div className="text-xs text-neutral-500">
-                <div>UPTIME: 99.7%</div>
-              </div>
+              {user && (
+                <div className="mt-3 pt-3 border-t border-neutral-700">
+                  <div className="flex items-center gap-2 mb-2">
+                    <User className="w-3.5 h-3.5 text-neutral-400" />
+                    <span className="text-xs text-white truncate">{user.displayName}</span>
+                  </div>
+                  <div className="text-xs text-neutral-500 mb-3 uppercase">{user.role}</div>
+                  <button
+                    onClick={logout}
+                    className="flex items-center gap-2 text-xs text-neutral-500 hover:text-red-400 transition-colors w-full"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    Sign Out
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

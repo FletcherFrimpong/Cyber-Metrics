@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import edrDataService from '@/lib/edr-data-service';
+import { requireAuth, isAuthError } from '@/lib/auth/api-guard';
 
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth("alerts:view");
+  if (isAuthError(auth)) return auth;
+
   try {
     const { searchParams } = new URL(request.url);
     
@@ -54,6 +58,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth("settings:edit");
+  if (isAuthError(auth)) return auth;
+
   try {
     const body = await request.json();
     const { action, config } = body;

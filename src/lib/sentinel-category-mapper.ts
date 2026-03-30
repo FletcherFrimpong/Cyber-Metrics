@@ -240,7 +240,7 @@ export function transformSentinelAlert(
       classification: incident.classification,
       classificationReason: incident.classificationReason,
       productName: alert.productName,
-      Confidence: alert.confidence || (severity === "Critical" ? 95 : severity === "High" ? 85 : 70),
+      Confidence: alert.confidence || null,
       incidentUrl: incident.incidentWebUrl,
       alertUrl: alert.alertWebUrl,
     },
@@ -273,7 +273,7 @@ export function transformIncident(incident: SentinelIncident): {
       rawLog: {
         incidentId: incident.id,
         classification: incident.classification,
-        Confidence: severity === "Critical" ? 95 : severity === "High" ? 85 : 70,
+        Confidence: null,
       },
       mitreTactics: [],
       mitreTechniques: [],
