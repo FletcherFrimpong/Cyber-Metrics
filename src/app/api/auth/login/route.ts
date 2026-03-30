@@ -3,6 +3,8 @@ import { getUserByUsername, seedDefaultAdmin } from "@/lib/auth/user-store";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 import { toSafeUser } from "@/lib/auth/user-store";
+import { existsSync, unlinkSync } from "fs";
+import { join } from "path";
 
 // Simple rate limiter: IP -> { count, resetAt }
 const failedAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -93,6 +95,15 @@ export async function POST(request: NextRequest) {
 
   clearFailures(ip);
   await createSession(user);
+
+  // Auto-delete initial credentials file after first admin login
+  try {
+    const credsFile = join(process.cwd(), ".data", "initial-credentials.txt");
+    if (existsSync(credsFile)) {
+      unlinkSync(credsFile);
+      console.log("[auth] Initial credentials file deleted after successful login.");
+    }
+  } catch {}
 
   return NextResponse.json({
     success: true,

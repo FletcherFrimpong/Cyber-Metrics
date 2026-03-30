@@ -11,14 +11,9 @@ const PUBLIC_PATHS = [
   "/api/auth/accept-invite",
 ];
 
-function getSecret(): Uint8Array {
+function getSecret(): Uint8Array | null {
   const secret = process.env.AUTH_SECRET;
-  if (!secret) {
-    // In development, the jwt.ts module auto-generates and sets AUTH_SECRET.
-    // If middleware runs before that, redirect to login (session will be
-    // validated on the next request after the secret is initialized).
-    return new TextEncoder().encode("__uninitialized__");
-  }
+  if (!secret) return null;
   return new TextEncoder().encode(secret);
 }
 
@@ -52,8 +47,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
+  const secret = getSecret();
+  if (!secret) {
+    // AUTH_SECRET not initialized yet — reject token, force re-auth
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
+
   try {
-    const { payload } = await jwtVerify(token, getSecret());
+    const { payload } = await jwtVerify(token, secret);
 
     // Attach user info to request headers for downstream use
     const response = NextResponse.next();

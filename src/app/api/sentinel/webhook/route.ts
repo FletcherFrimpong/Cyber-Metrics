@@ -25,22 +25,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Sentinel not configured" }, { status: 503 });
     }
 
-    // Verify webhook signature if secret is configured
-    if (config.webhookSecret) {
-      const signature = request.headers.get("x-sentinel-signature") || "";
-      const bodyText = await request.text();
-
-      if (!verifySignature(bodyText, signature, config.webhookSecret)) {
-        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-      }
-
-      // Parse the body we already read
-      const payload = JSON.parse(bodyText);
-      return await processPayload(payload);
+    // Webhook MUST have a secret configured — reject if not
+    if (!config.webhookSecret) {
+      return NextResponse.json(
+        { error: "Webhook secret not configured. Set SENTINEL_WEBHOOK_SECRET to enable this endpoint." },
+        { status: 403 }
+      );
     }
 
-    // No signature verification — just parse
-    const payload = await request.json();
+    // Verify HMAC signature
+    const signature = request.headers.get("x-sentinel-signature") || "";
+    const bodyText = await request.text();
+
+    if (!verifySignature(bodyText, signature, config.webhookSecret)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
+    const payload = JSON.parse(bodyText);
     return await processPayload(payload);
   } catch (error: any) {
     console.error("Sentinel webhook error:", error);

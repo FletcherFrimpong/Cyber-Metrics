@@ -84,7 +84,7 @@ export async function createUser(data: {
 }): Promise<SafeUser> {
   const existing = getUserByUsername(data.username);
   if (existing) {
-    throw new Error(`Username "${data.username}" already exists`);
+    throw new Error("This username is not available");
   }
 
   const now = new Date().toISOString();
@@ -160,7 +160,7 @@ export async function createInvite(data: {
 }): Promise<{ user: SafeUser; inviteToken: string }> {
   const existing = getUserByEmail(data.email);
   if (existing) {
-    throw new Error(`A user with email "${data.email}" already exists`);
+    throw new Error("An invite has already been sent to this email address");
   }
 
   const now = new Date();

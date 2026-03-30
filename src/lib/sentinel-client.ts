@@ -82,6 +82,11 @@ export class SentinelClient {
   async getResolvedIncidents(since?: string, limit?: number): Promise<SentinelIncident[]> {
     let filter = "status eq 'resolved'";
     if (since) {
+      // Validate ISO 8601 format to prevent OData filter injection
+      const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z?$/;
+      if (!isoRegex.test(since)) {
+        throw new Error("Invalid date format for 'since' parameter");
+      }
       filter += ` and lastModifiedDateTime ge ${since}`;
     }
 

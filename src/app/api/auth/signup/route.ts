@@ -1,7 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createUser } from "@/lib/auth/user-store";
 
+// Rate limiter — prevent mass account creation
+const signupAttempts = new Map<string, { count: number; resetAt: number }>();
+const MAX_SIGNUPS = 5;
+const WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = signupAttempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    signupAttempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= MAX_SIGNUPS;
+}
+
 export async function POST(request: NextRequest) {
+  const ip =
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { error: "Too many signup attempts. Try again later." },
+      { status: 429 }
+    );
+  }
+
   let body: any;
   try {
     body = await request.json();

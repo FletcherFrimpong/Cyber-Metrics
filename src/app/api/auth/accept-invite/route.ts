@@ -1,9 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByInviteToken, acceptInvite } from "@/lib/auth/user-store";
-import { toSafeUser } from "@/lib/auth/user-store";
+
+// Rate limiter for token validation — prevents brute-force enumeration
+const attempts = new Map<string, { count: number; resetAt: number }>();
+const MAX_ATTEMPTS = 10;
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = attempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    attempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= MAX_ATTEMPTS;
+}
 
 // GET: Validate token and return invite info (name, role, email)
 export async function GET(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ error: "Too many attempts. Try again later." }, { status: 429 });
+  }
+
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
 
