@@ -341,41 +341,31 @@ class EDRDataService {
   // ─── HELPERS ───────────────────────────────────────────────────────────────
 
   private parseTimeframe(timeframe: string): { startTime: string; endTime: string } {
-    if (!timeframe) {
-      // Default to current quarter
-      const now = new Date();
-      const cq = Math.floor(now.getMonth() / 3) + 1;
-      const cy = now.getFullYear();
-      const sm = (cq - 1) * 3;
+    // Use UTC dates to avoid timezone drift with Sentinel data (which is always UTC)
+    const makeQuarterRange = (year: number, quarter: number) => {
+      const startMonth = (quarter - 1) * 3; // 0-indexed: Q1=0, Q2=3, Q3=6, Q4=9
+      const endMonth = startMonth + 3;       // exclusive: Q1 ends at month 3 (April 1)
       return {
-        startTime: new Date(cy, sm, 1).toISOString(),
-        endTime: new Date(cy, sm + 3, 0, 23, 59, 59).toISOString(),
+        startTime: new Date(Date.UTC(year, startMonth, 1)).toISOString(),
+        endTime: new Date(Date.UTC(year, endMonth, 0, 23, 59, 59, 999)).toISOString(),
       };
-    }
-
-    const yearMatch = timeframe.match(/(\d{4})/);
-    const quarterMatch = timeframe.match(/Q(\d)/);
-
-    if (yearMatch && quarterMatch) {
-      const year = parseInt(yearMatch[1] || "2024");
-      const quarter = parseInt(quarterMatch[1] || "1");
-      const startMonth = (quarter - 1) * 3;
-      const endMonth = startMonth + 2;
-      return {
-        startTime: new Date(year, startMonth, 1).toISOString(),
-        endTime: new Date(year, endMonth + 1, 0, 23, 59, 59).toISOString(),
-      };
-    }
-
-    // Default to current quarter
-    const now = new Date();
-    const cq = Math.floor(now.getMonth() / 3) + 1;
-    const cy = now.getFullYear();
-    const sm = (cq - 1) * 3;
-    return {
-      startTime: new Date(cy, sm, 1).toISOString(),
-      endTime: new Date(cy, sm + 3, 0, 23, 59, 59).toISOString(),
     };
+
+    if (timeframe) {
+      const yearMatch = timeframe.match(/(\d{4})/);
+      const quarterMatch = timeframe.match(/Q(\d)/);
+
+      if (yearMatch && quarterMatch) {
+        const year = parseInt(yearMatch[1]);
+        const quarter = parseInt(quarterMatch[1]);
+        return makeQuarterRange(year, quarter);
+      }
+    }
+
+    // Default to current quarter (UTC)
+    const now = new Date();
+    const cq = Math.floor(now.getUTCMonth() / 3) + 1;
+    return makeQuarterRange(now.getUTCFullYear(), cq);
   }
 }
 

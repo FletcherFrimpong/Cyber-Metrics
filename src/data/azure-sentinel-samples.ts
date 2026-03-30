@@ -68,7 +68,7 @@ export const generateTimeframeAlerts = (timeframe: string): AzureSentinelAlert[]
     const category = categories[i % categories.length];
     const source = sources[i % sources.length];
     const platform = platforms[i % platforms.length];
-    const timestamp = new Date(year, (quarter - 1) * 3 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1, Math.floor(Math.random() * 24), Math.floor(Math.random() * 60)).toISOString();
+    const timestamp = new Date(Date.UTC(year, (quarter - 1) * 3 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1, Math.floor(Math.random() * 24), Math.floor(Math.random() * 60))).toISOString();
     
     alerts.push({
       id: `EDR-${year}-${String(alertIndex++).padStart(3, '0')}`,
@@ -105,7 +105,7 @@ export const generateTimeframeAlerts = (timeframe: string): AzureSentinelAlert[]
     const category = categories[i % categories.length];
     const source = sources[i % sources.length];
     const platform = platforms[i % platforms.length];
-    const timestamp = new Date(year, (quarter - 1) * 3 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1, Math.floor(Math.random() * 24), Math.floor(Math.random() * 60)).toISOString();
+    const timestamp = new Date(Date.UTC(year, (quarter - 1) * 3 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1, Math.floor(Math.random() * 24), Math.floor(Math.random() * 60))).toISOString();
     
     alerts.push({
       id: `EDR-${year}-${String(alertIndex++).padStart(3, '0')}`,
@@ -142,7 +142,7 @@ export const generateTimeframeAlerts = (timeframe: string): AzureSentinelAlert[]
     const category = categories[i % categories.length];
     const source = sources[i % sources.length];
     const platform = platforms[i % platforms.length];
-    const timestamp = new Date(year, (quarter - 1) * 3 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1, Math.floor(Math.random() * 24), Math.floor(Math.random() * 60)).toISOString();
+    const timestamp = new Date(Date.UTC(year, (quarter - 1) * 3 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1, Math.floor(Math.random() * 24), Math.floor(Math.random() * 60))).toISOString();
     
     alerts.push({
       id: `EDR-${year}-${String(alertIndex++).padStart(3, '0')}`,
@@ -179,7 +179,7 @@ export const generateTimeframeAlerts = (timeframe: string): AzureSentinelAlert[]
     const category = categories[i % categories.length];
     const source = sources[i % sources.length];
     const platform = platforms[i % platforms.length];
-    const timestamp = new Date(year, (quarter - 1) * 3 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1, Math.floor(Math.random() * 24), Math.floor(Math.random() * 60)).toISOString();
+    const timestamp = new Date(Date.UTC(year, (quarter - 1) * 3 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 28) + 1, Math.floor(Math.random() * 24), Math.floor(Math.random() * 60))).toISOString();
     
     alerts.push({
       id: `EDR-${year}-${String(alertIndex++).padStart(3, '0')}`,
