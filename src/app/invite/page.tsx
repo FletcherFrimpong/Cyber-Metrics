@@ -101,8 +101,8 @@ export default function InvitePage() {
   // Loading state
   if (validating) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-neutral-900 animate-spin" />
       </div>
     );
   }
@@ -110,16 +110,16 @@ export default function InvitePage() {
   // Invalid/expired token
   if (invalidError) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center px-4">
+      <div className="min-h-screen bg-white flex items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-50 border border-red-200 mb-4">
             <XCircle className="w-8 h-8 text-red-500" />
           </div>
-          <h1 className="text-white text-xl font-semibold mb-2">Invalid Invite</h1>
-          <p className="text-neutral-400 text-sm mb-6">{invalidError}</p>
+          <h1 className="text-neutral-900 text-xl font-semibold mb-2">Invalid Invite</h1>
+          <p className="text-neutral-500 text-sm mb-6">{invalidError}</p>
           <Button
             onClick={() => router.push("/login")}
-            className="bg-orange-600 hover:bg-orange-700 text-white"
+            className="bg-neutral-900 hover:bg-neutral-800 text-white"
           >
             Go to Login
           </Button>
@@ -131,14 +131,14 @@ export default function InvitePage() {
   // Success state
   if (success) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center px-4">
+      <div className="min-h-screen bg-white flex items-center justify-center px-4">
         <div className="w-full max-w-md text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-50 border border-green-200 mb-4">
             <CheckCircle className="w-8 h-8 text-green-500" />
           </div>
-          <h1 className="text-white text-xl font-semibold mb-2">Account Created!</h1>
-          <p className="text-neutral-400 text-sm">Signing you in and redirecting to the dashboard...</p>
-          <Loader2 className="w-5 h-5 text-orange-500 animate-spin mx-auto mt-4" />
+          <h1 className="text-neutral-900 text-xl font-semibold mb-2">Account Created!</h1>
+          <p className="text-neutral-500 text-sm">Signing you in and redirecting to the dashboard...</p>
+          <Loader2 className="w-5 h-5 text-neutral-900 animate-spin mx-auto mt-4" />
         </div>
       </div>
     );
@@ -147,33 +147,33 @@ export default function InvitePage() {
   const roleLabel = inviteInfo?.role === "admin" ? "Administrator" : "Viewer";
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4">
+    <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-orange-500/10 border border-orange-500/20 mb-4">
-            <Shield className="w-8 h-8 text-orange-500" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neutral-100 border border-neutral-200 mb-4">
+            <Shield className="w-8 h-8 text-neutral-900" />
           </div>
-          <h1 className="text-orange-500 font-bold text-2xl tracking-wider">
+          <h1 className="text-neutral-900 font-bold text-2xl">
             SIGNAL FOUNDRY
           </h1>
-          <p className="text-neutral-500 text-xs mt-1 tracking-wide">
+          <p className="text-neutral-500 text-xs mt-1">
             Cyber Risk Quantification Platform
           </p>
         </div>
 
         {/* Card */}
-        <div className="bg-neutral-900 border border-neutral-700 rounded-lg p-8">
-          <h2 className="text-white text-lg font-semibold mb-1">Set Up Your Account</h2>
+        <div className="bg-white border border-neutral-200 rounded-lg p-8">
+          <h2 className="text-neutral-900 text-lg font-semibold mb-1">Set Up Your Account</h2>
           <p className="text-neutral-500 text-sm mb-2">
-            You've been invited as <span className="text-white font-medium">{roleLabel}</span>.
+            You've been invited as <span className="text-neutral-900 font-medium">{roleLabel}</span>.
           </p>
-          <p className="text-neutral-600 text-xs mb-6">
+          <p className="text-neutral-400 text-xs mb-6">
             {inviteInfo?.email}
           </p>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md text-red-400 text-sm">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
               {error}
             </div>
           )}
@@ -181,7 +181,7 @@ export default function InvitePage() {
           <form onSubmit={handleAccept}>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-neutral-400 mb-1.5">
+                <label className="block text-sm text-neutral-500 mb-1.5">
                   Username
                 </label>
                 <Input
@@ -193,12 +193,12 @@ export default function InvitePage() {
                   minLength={3}
                   autoFocus
                   autoComplete="username"
-                  className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-600 focus-visible:ring-orange-500/50 focus-visible:border-orange-500"
+                  className="bg-neutral-50 border-neutral-300 text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-orange-500/50 focus-visible:border-neutral-900"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-neutral-400 mb-1.5">
+                <label className="block text-sm text-neutral-500 mb-1.5">
                   Display Name
                 </label>
                 <Input
@@ -206,12 +206,12 @@ export default function InvitePage() {
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="Your full name"
-                  className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-600 focus-visible:ring-orange-500/50 focus-visible:border-orange-500"
+                  className="bg-neutral-50 border-neutral-300 text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-orange-500/50 focus-visible:border-neutral-900"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-neutral-400 mb-1.5">
+                <label className="block text-sm text-neutral-500 mb-1.5">
                   Password
                 </label>
                 <div className="relative">
@@ -223,12 +223,12 @@ export default function InvitePage() {
                     required
                     minLength={8}
                     autoComplete="new-password"
-                    className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-600 pr-10 focus-visible:ring-orange-500/50 focus-visible:border-orange-500"
+                    className="bg-neutral-50 border-neutral-300 text-neutral-900 placeholder:text-neutral-400 pr-10 focus-visible:ring-orange-500/50 focus-visible:border-neutral-900"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -236,7 +236,7 @@ export default function InvitePage() {
               </div>
 
               <div>
-                <label className="block text-sm text-neutral-400 mb-1.5">
+                <label className="block text-sm text-neutral-500 mb-1.5">
                   Confirm Password
                 </label>
                 <Input
@@ -247,7 +247,7 @@ export default function InvitePage() {
                   required
                   minLength={8}
                   autoComplete="new-password"
-                  className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-600 focus-visible:ring-orange-500/50 focus-visible:border-orange-500"
+                  className="bg-neutral-50 border-neutral-300 text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-orange-500/50 focus-visible:border-neutral-900"
                 />
               </div>
             </div>
@@ -255,7 +255,7 @@ export default function InvitePage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full mt-6 bg-orange-600 hover:bg-orange-700 text-white font-medium"
+              className="w-full mt-6 bg-neutral-900 hover:bg-neutral-800 text-white font-medium"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -269,7 +269,7 @@ export default function InvitePage() {
           </form>
         </div>
 
-        <p className="text-neutral-700 text-xs text-center mt-6">
+        <p className="text-neutral-300 text-xs text-center mt-6">
           SignalFoundry v1.0 &mdash; Secure Access
         </p>
       </div>

@@ -13,21 +13,21 @@ export default function GlobalError({
   return (
     <html>
       <body>
-        <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="min-h-screen bg-white flex items-center justify-center">
           <div className="text-center space-y-6">
             <div className="space-y-2">
               <h1 className="text-4xl font-bold text-red-500">Critical Error</h1>
-              <p className="text-neutral-400 max-w-md">
+              <p className="text-neutral-500 max-w-md">
                 A critical error occurred. Please refresh the page or contact support.
               </p>
               {error.digest && (
-                <p className="text-xs text-neutral-500 font-mono">
+                <p className="text-xs text-neutral-500 tabular-nums">
                   Error ID: {error.digest}
                 </p>
               )}
             </div>
             
-            <Button onClick={reset} className="bg-orange-600 hover:bg-orange-700">
+            <Button onClick={reset} className="bg-neutral-900 hover:bg-neutral-800">
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh Page
             </Button>

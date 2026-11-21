@@ -19,6 +19,31 @@ export interface AzureSentinelAlert {
   costImpact: number;
 }
 
+// Analyst verdict for a sample alert, as Sentinel would report it once the
+// incident is resolved. Out of every 10 alerts: `tp` true positives, `fp`
+// false positives, the rest left unclassified.
+const sampleClassification = (i: number, tp: number, fp: number): string => {
+  const slot = i % 10;
+  if (slot < tp) return "truePositive";
+  if (slot < tp + fp) return "falsePositive";
+  return "unknown";
+};
+
+// Furthest ATT&CK tactic observed, by sample alert category.
+const SAMPLE_TACTICS: Record<string, string[]> = {
+  "Malware Detection": ["Execution"],
+  "Ransomware Detection": ["Execution", "Impact"],
+  "Credential Access": ["Credential Access"],
+  "Suspicious Activity": ["Initial Access"],
+  "Process Injection": ["Execution", "Defense Evasion"],
+  "Lateral Movement": ["Lateral Movement"],
+  "Data Exfiltration": ["Collection", "Exfiltration"],
+  "Network Activity": ["Command and Control"],
+  "Registry Activity": ["Persistence"],
+};
+const sampleTactics = (category: string | undefined): string[] =>
+  SAMPLE_TACTICS[category || ""] || ["Execution"];
+
 // Timeframe-specific alert generation
 export const generateTimeframeAlerts = (timeframe: string): AzureSentinelAlert[] => {
   const alerts: AzureSentinelAlert[] = [];
@@ -85,9 +110,10 @@ export const generateTimeframeAlerts = (timeframe: string): AzureSentinelAlert[]
         "ProcessId": 1000 + i,
         "ProcessName": "suspicious.exe",
         "DetectionSource": "Behavioral Analysis",
-        "Confidence": 95 + (i % 5)
+        "Confidence": 95 + (i % 5),
+        "classification": sampleClassification(i, 8, 1)
       },
-      mitreTactics: ["Execution", "Defense Evasion"],
+      mitreTactics: sampleTactics(category),
       mitreTechniques: ["T1059", "T1027"],
       iocIndicators: [`192.168.1.${i + 1}`, `hash-${year}-${i}`],
       affectedEntities: [`DESKTOP-${year}-${i}`, `User: user${i}@company.com`],
@@ -122,9 +148,10 @@ export const generateTimeframeAlerts = (timeframe: string): AzureSentinelAlert[]
         "ProcessId": 2000 + i,
         "ProcessName": "suspicious.exe",
         "DetectionSource": "Behavioral Analysis",
-        "Confidence": 85 + (i % 10)
+        "Confidence": 85 + (i % 10),
+        "classification": sampleClassification(i, 6, 2)
       },
-      mitreTactics: ["Execution", "Defense Evasion"],
+      mitreTactics: sampleTactics(category),
       mitreTechniques: ["T1059", "T1027"],
       iocIndicators: [`192.168.1.${i + 1}`, `hash-${year}-${i}`],
       affectedEntities: [`DESKTOP-${year}-${i}`, `User: user${i}@company.com`],
@@ -159,9 +186,10 @@ export const generateTimeframeAlerts = (timeframe: string): AzureSentinelAlert[]
         "ProcessId": 3000 + i,
         "ProcessName": "suspicious.exe",
         "DetectionSource": "Behavioral Analysis",
-        "Confidence": 70 + (i % 15)
+        "Confidence": 70 + (i % 15),
+        "classification": sampleClassification(i, 3, 4)
       },
-      mitreTactics: ["Execution"],
+      mitreTactics: sampleTactics(category),
       mitreTechniques: ["T1059"],
       iocIndicators: [`192.168.1.${i + 1}`, `hash-${year}-${i}`],
       affectedEntities: [`DESKTOP-${year}-${i}`, `User: user${i}@company.com`],
@@ -196,9 +224,10 @@ export const generateTimeframeAlerts = (timeframe: string): AzureSentinelAlert[]
         "ProcessId": 4000 + i,
         "ProcessName": "suspicious.exe",
         "DetectionSource": "Behavioral Analysis",
-        "Confidence": 50 + (i % 20)
+        "Confidence": 50 + (i % 20),
+        "classification": sampleClassification(i, 1, 6)
       },
-      mitreTactics: ["Execution"],
+      mitreTactics: sampleTactics(category),
       mitreTechniques: ["T1059"],
       iocIndicators: [`192.168.1.${i + 1}`, `hash-${year}-${i}`],
       affectedEntities: [`DESKTOP-${year}-${i}`, `User: user${i}@company.com`],

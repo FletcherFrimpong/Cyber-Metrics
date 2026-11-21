@@ -95,10 +95,10 @@ export default function EDRConfigPanel({ onConfigChange }: EDRConfigPanelProps) 
   }, []);
 
   return (
-    <Card className="bg-neutral-900 border-neutral-700">
+    <Card className="bg-white border-neutral-200">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-white text-lg flex items-center gap-2">
+          <CardTitle className="text-neutral-900 text-lg flex items-center gap-2">
             <Settings className="w-5 h-5" />
             EDR API Configuration
           </CardTitle>
@@ -114,16 +114,16 @@ export default function EDRConfigPanel({ onConfigChange }: EDRConfigPanelProps) 
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Connection Status */}
-        <div className="flex items-center justify-between p-3 bg-neutral-800/50 rounded-lg border border-neutral-700/50">
+        <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-200">
           <div className="flex items-center gap-3">
             {status?.hasAPIClient ? (
-              <Wifi className="w-5 h-5 text-green-400" />
+              <Wifi className="w-5 h-5 text-green-600" />
             ) : (
-              <WifiOff className="w-5 h-5 text-red-400" />
+              <WifiOff className="w-5 h-5 text-red-600" />
             )}
             <div>
-              <div className="text-white font-medium">API Connection</div>
-              <div className="text-sm text-neutral-400">
+              <div className="text-neutral-900 font-medium">API Connection</div>
+              <div className="text-sm text-neutral-500">
                 {status?.hasAPIClient ? 'Connected to EDR Platform' : 'Using Sample Data'}
               </div>
             </div>
@@ -131,8 +131,8 @@ export default function EDRConfigPanel({ onConfigChange }: EDRConfigPanelProps) 
           <Badge 
             variant="outline" 
             className={status?.hasAPIClient ? 
-              "bg-green-500/10 border-green-500/30 text-green-400" : 
-              "bg-red-500/10 border-red-500/30 text-red-400"
+              "bg-green-50 border-green-200 text-green-600" : 
+              "bg-red-50 border-red-200 text-red-600"
             }
           >
             {status?.hasAPIClient ? 'Connected' : 'Sample Data'}
@@ -143,8 +143,8 @@ export default function EDRConfigPanel({ onConfigChange }: EDRConfigPanelProps) 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-white font-medium">Use Real EDR Data</div>
-              <div className="text-sm text-neutral-400">
+              <div className="text-neutral-900 font-medium">Use Real EDR Data</div>
+              <div className="text-sm text-neutral-500">
                 Connect to actual EDR platform APIs
               </div>
             </div>
@@ -160,8 +160,8 @@ export default function EDRConfigPanel({ onConfigChange }: EDRConfigPanelProps) 
 
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-white font-medium">Fallback to Sample Data</div>
-              <div className="text-sm text-neutral-400">
+              <div className="text-neutral-900 font-medium">Fallback to Sample Data</div>
+              <div className="text-sm text-neutral-500">
                 Use sample data when API is unavailable
               </div>
             </div>
@@ -177,12 +177,12 @@ export default function EDRConfigPanel({ onConfigChange }: EDRConfigPanelProps) 
         </div>
 
         {/* Cache Information */}
-        <div className="flex items-center justify-between p-3 bg-neutral-800/50 rounded-lg border border-neutral-700/50">
+        <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg border border-neutral-200">
           <div className="flex items-center gap-3">
-            <Database className="w-5 h-5 text-blue-400" />
+            <Database className="w-5 h-5 text-blue-600" />
             <div>
-              <div className="text-white font-medium">Cache Status</div>
-              <div className="text-sm text-neutral-400">
+              <div className="text-neutral-900 font-medium">Cache Status</div>
+              <div className="text-sm text-neutral-500">
                 {status?.cacheSize || 0} cached queries
               </div>
             </div>
@@ -198,9 +198,9 @@ export default function EDRConfigPanel({ onConfigChange }: EDRConfigPanelProps) 
         </div>
 
         {/* Environment Variables Info */}
-        <div className="p-3 bg-neutral-800/50 rounded-lg border border-neutral-700/50">
-          <div className="text-white font-medium mb-2">Required Environment Variables</div>
-          <div className="text-sm text-neutral-400 space-y-1">
+        <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+          <div className="text-neutral-900 font-medium mb-2">Required Environment Variables</div>
+          <div className="text-sm text-neutral-500 space-y-1">
             <div>• NEXT_PUBLIC_EDR_PLATFORM</div>
             <div>• NEXT_PUBLIC_EDR_BASE_URL</div>
             <div>• NEXT_PUBLIC_EDR_API_KEY (or platform-specific credentials)</div>
@@ -214,26 +214,26 @@ export default function EDRConfigPanel({ onConfigChange }: EDRConfigPanelProps) 
         {status && (
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div className="flex justify-between">
-              <span className="text-neutral-400">API Client:</span>
-              <span className={status.hasAPIClient ? "text-green-400" : "text-red-400"}>
+              <span className="text-neutral-500">API Client:</span>
+              <span className={status.hasAPIClient ? "text-green-600" : "text-red-600"}>
                 {status.hasAPIClient ? "Available" : "Not Available"}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-neutral-400">Real Data:</span>
-              <span className={status.useRealData ? "text-green-400" : "text-yellow-400"}>
+              <span className="text-neutral-500">Real Data:</span>
+              <span className={status.useRealData ? "text-green-600" : "text-yellow-600"}>
                 {status.useRealData ? "Enabled" : "Disabled"}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-neutral-400">Fallback:</span>
-              <span className={status.fallbackToSampleData ? "text-green-400" : "text-yellow-400"}>
+              <span className="text-neutral-500">Fallback:</span>
+              <span className={status.fallbackToSampleData ? "text-green-600" : "text-yellow-600"}>
                 {status.fallbackToSampleData ? "Enabled" : "Disabled"}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-neutral-400">Cache Size:</span>
-              <span className="text-blue-400">{status.cacheSize}</span>
+              <span className="text-neutral-500">Cache Size:</span>
+              <span className="text-blue-600">{status.cacheSize}</span>
             </div>
           </div>
         )}

@@ -266,7 +266,7 @@ export async function seedDefaultAdmin(): Promise<void> {
         `Username: admin`,
         `Password: ${password}`,
         "",
-        "Login at: http://localhost:3000/login",
+        "Login at: http://localhost:3002/login",
         "",
         "IMPORTANT: Change this password immediately after first login.",
         "Delete this file after you have logged in.",

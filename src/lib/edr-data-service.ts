@@ -4,6 +4,7 @@
 // All consumers (cost-calculations, dashboard, trends) go through this service.
 
 import type { SecurityAlert, CategorizedAlerts, EDRQueryParams } from "@/types/alerts";
+import { getAlertStore, type AlertStore } from "./alert-store";
 
 export type { CategorizedAlerts } from "@/types/alerts";
 
@@ -28,8 +29,64 @@ class EDRDataService {
   private cache: Map<string, { data: SecurityAlert[]; timestamp: number }> = new Map();
   private cacheDuration = 5 * 60 * 1000; // 5 minutes
 
+  // Durable copy of every real alert; null if the database cannot be opened.
+  private store: AlertStore | null = null;
+
   constructor() {
+    this.loadPersistedAlerts();
     this.initializeSentinel();
+  }
+
+  // ─── PERSISTENCE ───────────────────────────────────────────────────────────
+  // Real alerts are written to .data/signalfoundry.db as they arrive and read
+  // back here on startup, so a restart keeps the history.
+
+  private loadPersistedAlerts(): void {
+    try {
+      this.store = getAlertStore();
+      const rows = this.store.loadAll();
+      for (const { category, alert } of rows) {
+        if (this.sentinelAlerts[category]) this.sentinelAlerts[category].push(alert);
+      }
+      this.sentinelAlertCount = rows.length;
+      if (rows.length > 0) {
+        this.sampleDataLoaded = true; // real history exists: never mix in demo data
+        this.lastIngestTime = new Date().toISOString();
+        console.log(`Loaded ${rows.length} stored alerts from disk`);
+      }
+    } catch (err: any) {
+      this.store = null;
+      console.error("Alert storage unavailable; alerts will be kept in memory only:", err?.message || err);
+    }
+  }
+
+  private persist(action: (store: AlertStore) => void): void {
+    if (!this.store) return;
+    try {
+      action(this.store);
+    } catch (err: any) {
+      console.error("Failed to write to alert storage:", err?.message || err);
+    }
+  }
+
+  private sentinelState() {
+    return {
+      get: () => this.getSourceState("sentinel"),
+      set: (value: string) => this.setSourceState("sentinel", value),
+    };
+  }
+
+  /** Last successful poll time for a source, kept across restarts. */
+  getSourceState(source: string): string | null {
+    try {
+      return this.store?.getState(source) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  setSourceState(source: string, value: string | null): void {
+    this.persist((store) => store.setState(source, value));
   }
 
   // ─── SENTINEL INITIALIZATION ───────────────────────────────────────────────
@@ -37,8 +94,10 @@ class EDRDataService {
   private async initializeSentinel(): Promise<void> {
     // Check env vars directly — avoid importing config module at top level
     if (!process.env.SENTINEL_TENANT_ID || !process.env.SENTINEL_CLIENT_ID || !process.env.SENTINEL_CLIENT_SECRET) {
-      console.log("No Sentinel configured — loading sample data for demonstration.");
-      this.loadSampleData();
+      if (this.sentinelAlertCount === 0) {
+        console.log("No Sentinel configured — loading sample data for demonstration.");
+        this.loadSampleData();
+      }
       return;
     }
 
@@ -48,7 +107,7 @@ class EDRDataService {
 
     const config = getSentinelConfig();
     if (!config) {
-      this.loadSampleData();
+      if (this.sentinelAlertCount === 0) this.loadSampleData();
       return;
     }
 
@@ -57,7 +116,7 @@ class EDRDataService {
 
     this.poller = new SentinelPoller(config, (alerts, category) => {
       this.ingestAlerts(alerts as SecurityAlert[], category);
-    });
+    }, this.sentinelState());
 
     this.poller.start();
   }
@@ -121,18 +180,53 @@ class EDRDataService {
 
   // ─── ALERT INGESTION (from poller or webhook) ──────────────────────────────
 
-  ingestAlerts(alerts: SecurityAlert[], category: AlertCategory): void {
-    // Deduplicate by alert ID
-    const existingIds = new Set(this.sentinelAlerts[category].map(a => a.id));
-    const newAlerts = alerts.filter(a => !existingIds.has(a.id));
+  /** Called when a real data source connects: drops the demonstration data. */
+  useRealData(): void {
+    this.clearSampleData();
+  }
 
-    if (newAlerts.length > 0) {
-      this.sentinelAlerts[category].push(...newAlerts);
-      this.sentinelAlertCount += newAlerts.length;
-      this.lastIngestTime = new Date().toISOString();
-      // Invalidate cache since we have new data
-      this.cache.clear();
+  /** Drop every alert from one source, e.g. when its connector is disconnected. */
+  removeBySourcePrefix(prefix: string): void {
+    for (const key of Object.keys(this.sentinelAlerts) as AlertCategory[]) {
+      this.sentinelAlerts[key] = this.sentinelAlerts[key].filter(a => !a.id.startsWith(prefix));
     }
+    this.sentinelAlertCount = Object.values(this.sentinelAlerts).reduce((sum, arr) => sum + arr.length, 0);
+    this.cache.clear();
+    this.persist((store) => store.deleteByPrefix(prefix));
+  }
+
+  /** With no data source left, show the demonstration data again. */
+  restoreSampleData(): void {
+    if (this.sentinelConnected || this.usingSampleData) return;
+    if (this.sentinelAlertCount > 0) return; // real history from another source is still held
+    this.sampleDataLoaded = false;
+    this.cache.clear();
+    this.loadSampleData();
+  }
+
+  /** Alerts held from one source (matched on the alert id prefix). */
+  countBySourcePrefix(prefix: string): number {
+    return Object.values(this.sentinelAlerts).reduce(
+      (sum, list) => sum + list.filter(a => a.id.startsWith(prefix)).length, 0);
+  }
+
+  ingestAlerts(alerts: SecurityAlert[], category: AlertCategory): void {
+    if (alerts.length === 0) return;
+    this.clearSampleData();
+
+    // Upsert by alert ID: a re-fetched alert replaces the stored one, so a
+    // verdict or severity changed in the source system is picked up. An alert
+    // that moved category is removed from its old one.
+    const incoming = new Map(alerts.map(a => [a.id, a]));
+    for (const key of Object.keys(this.sentinelAlerts) as AlertCategory[]) {
+      this.sentinelAlerts[key] = this.sentinelAlerts[key].filter(a => !incoming.has(a.id));
+    }
+    this.sentinelAlerts[category].push(...incoming.values());
+    this.sentinelAlertCount = Object.values(this.sentinelAlerts).reduce((sum, arr) => sum + arr.length, 0);
+    this.lastIngestTime = new Date().toISOString();
+    this.cache.clear();
+
+    this.persist((store) => store.upsert([...incoming.values()], category));
   }
 
   // ─── PRIMARY DATA ACCESS ───────────────────────────────────────────────────
@@ -249,7 +343,7 @@ class EDRDataService {
 
     this.poller = new SentinelPoller(sentinelConfig, (alerts, category) => {
       this.ingestAlerts(alerts as SecurityAlert[], category);
-    });
+    }, this.sentinelState());
 
     this.sentinelConnected = true;
     this.poller.start();
@@ -259,9 +353,9 @@ class EDRDataService {
   async syncSentinel(since?: string, fullResync?: boolean) {
     if (!this.poller) throw new Error("Sentinel not configured");
     if (fullResync) {
-      // Clear existing data for a fresh start
-      this.sentinelAlerts = { edr: [], email: [], network: [], web: [], cloud: [] };
-      this.sentinelAlertCount = 0;
+      // Clear Sentinel's own alerts for a fresh start (other sources are kept)
+      this.removeBySourcePrefix("SENTINEL-");
+      this.setSourceState("sentinel", null);
     }
     return this.poller.syncNow(since, fullResync);
   }
@@ -331,6 +425,7 @@ class EDRDataService {
       cacheSize: this.cache.size,
       sentinelAlertCount: this.sentinelAlertCount,
       lastIngestTime: this.lastIngestTime,
+      persistent: this.store !== null,
     };
   }
 

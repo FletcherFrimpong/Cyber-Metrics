@@ -12,29 +12,29 @@ import {
 import type { SecurityAlert, CategorizedAlerts } from "@/types/alerts";
 
 const categories = [
-  { id: "all", name: "All", icon: <Filter className="w-4 h-4" />, color: "text-neutral-400", bg: "bg-neutral-500/10", border: "border-neutral-500/30" },
-  { id: "edr", name: "EDR", icon: <Shield className="w-4 h-4" />, color: "text-blue-400", bg: "bg-blue-500/10", border: "border-blue-500/30" },
-  { id: "email", name: "Email", icon: <Mail className="w-4 h-4" />, color: "text-purple-400", bg: "bg-purple-500/10", border: "border-purple-500/30" },
-  { id: "network", name: "Network", icon: <Globe className="w-4 h-4" />, color: "text-cyan-400", bg: "bg-cyan-500/10", border: "border-cyan-500/30" },
-  { id: "web", name: "Web", icon: <Lock className="w-4 h-4" />, color: "text-yellow-400", bg: "bg-yellow-500/10", border: "border-yellow-500/30" },
-  { id: "cloud", name: "Cloud", icon: <Monitor className="w-4 h-4" />, color: "text-green-400", bg: "bg-green-500/10", border: "border-green-500/30" },
+  { id: "all", name: "All", icon: <Filter className="w-4 h-4" />, color: "text-neutral-500", bg: "bg-neutral-500/10", border: "border-neutral-500/30" },
+  { id: "edr", name: "EDR", icon: <Shield className="w-4 h-4" />, color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
+  { id: "email", name: "Email", icon: <Mail className="w-4 h-4" />, color: "text-purple-600", bg: "bg-purple-50", border: "border-purple-200" },
+  { id: "network", name: "Network", icon: <Globe className="w-4 h-4" />, color: "text-cyan-600", bg: "bg-cyan-50", border: "border-cyan-200" },
+  { id: "web", name: "Web", icon: <Lock className="w-4 h-4" />, color: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-200" },
+  { id: "cloud", name: "Cloud", icon: <Monitor className="w-4 h-4" />, color: "text-green-600", bg: "bg-green-50", border: "border-green-200" },
 ];
 
 const severityLevels = [
-  { id: "all", name: "All", color: "text-neutral-400" },
-  { id: "Critical", name: "Critical", color: "text-red-400" },
-  { id: "High", name: "High", color: "text-orange-400" },
-  { id: "Medium", name: "Medium", color: "text-yellow-400" },
-  { id: "Low", name: "Low", color: "text-green-400" },
+  { id: "all", name: "All", color: "text-neutral-500" },
+  { id: "Critical", name: "Critical", color: "text-red-600" },
+  { id: "High", name: "High", color: "text-neutral-900" },
+  { id: "Medium", name: "Medium", color: "text-yellow-600" },
+  { id: "Low", name: "Low", color: "text-green-600" },
 ];
 
 function getSeverityColor(severity: string) {
   switch (severity) {
-    case "Critical": return "bg-red-500/10 border-red-500/30 text-red-400";
-    case "High": return "bg-orange-500/10 border-orange-500/30 text-orange-400";
-    case "Medium": return "bg-yellow-500/10 border-yellow-500/30 text-yellow-400";
-    case "Low": return "bg-green-500/10 border-green-500/30 text-green-400";
-    default: return "bg-neutral-500/10 border-neutral-500/30 text-neutral-400";
+    case "Critical": return "bg-red-50 border-red-200 text-red-600";
+    case "High": return "bg-orange-50 border-orange-200 text-neutral-900";
+    case "Medium": return "bg-yellow-50 border-yellow-200 text-yellow-600";
+    case "Low": return "bg-green-50 border-green-200 text-green-600";
+    default: return "bg-neutral-500/10 border-neutral-500/30 text-neutral-500";
   }
 }
 
@@ -150,12 +150,12 @@ export default function AzureSentinelAlertsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-wider">Security Alerts</h1>
-          <p className="text-sm text-neutral-400">
+          <h1 className="text-2xl font-bold text-neutral-900">Security Alerts</h1>
+          <p className="text-sm text-neutral-500">
             Resolved incidents from Microsoft Sentinel &mdash; {timeframe}
           </p>
         </div>
-        <Badge variant="outline" className="bg-blue-500/10 border-blue-500/30 text-blue-400 text-xs">
+        <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-600 text-xs">
           {categoryCounts.all || 0} Total Alerts
         </Badge>
       </div>
@@ -163,22 +163,22 @@ export default function AzureSentinelAlertsPage() {
       {/* Summary Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Alerts", value: stats.total.toLocaleString(), color: "text-white" },
-          { label: "Critical", value: stats.critical.toLocaleString(), color: "text-red-400" },
-          { label: "High", value: stats.high.toLocaleString(), color: "text-orange-400" },
-          { label: "Cost Impact", value: formatCost(stats.totalImpact), color: "text-green-400" },
+          { label: "Total Alerts", value: stats.total.toLocaleString(), color: "text-neutral-900" },
+          { label: "Critical", value: stats.critical.toLocaleString(), color: "text-red-600" },
+          { label: "High", value: stats.high.toLocaleString(), color: "text-neutral-900" },
+          { label: "Cost Impact", value: formatCost(stats.totalImpact), color: "text-green-600" },
         ].map((s) => (
-          <Card key={s.label} className="bg-neutral-900 border-neutral-800">
+          <Card key={s.label} className="bg-white border-neutral-200">
             <CardContent className="p-4 text-center">
-              <p className="text-xs text-neutral-500 uppercase tracking-wide">{s.label}</p>
-              <p className={`text-2xl font-bold font-mono ${s.color}`}>{s.value}</p>
+              <p className="text-xs text-neutral-500">{s.label}</p>
+              <p className={`text-2xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
       {/* Filters */}
-      <Card className="bg-neutral-900 border-neutral-800">
+      <Card className="bg-white border-neutral-200">
         <CardContent className="p-4 space-y-4">
           {/* Search */}
           <div className="relative">
@@ -187,7 +187,7 @@ export default function AzureSentinelAlertsPage() {
               placeholder="Search alerts by title, source, MITRE tactic, or entity..."
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setMaxVisible(20); }}
-              className="pl-9 bg-neutral-800 border-neutral-700 text-white text-sm"
+              className="pl-9 bg-neutral-50 border-neutral-200 text-neutral-900 text-sm"
             />
           </div>
 
@@ -202,7 +202,7 @@ export default function AzureSentinelAlertsPage() {
                 className={`text-xs gap-1.5 ${
                   selectedCategory === cat.id
                     ? `${cat.bg} ${cat.border} border ${cat.color}`
-                    : "bg-neutral-800 border-neutral-700 text-neutral-400 hover:bg-neutral-700"
+                    : "bg-neutral-50 border-neutral-200 text-neutral-500 hover:bg-neutral-100"
                 }`}
               >
                 {cat.icon}
@@ -222,8 +222,8 @@ export default function AzureSentinelAlertsPage() {
                 onClick={() => { setSelectedSeverity(sev.id); setMaxVisible(20); }}
                 className={`text-xs ${
                   selectedSeverity === sev.id
-                    ? "bg-neutral-700 border-neutral-500 border"
-                    : "bg-neutral-800 border-neutral-700 hover:bg-neutral-700"
+                    ? "bg-neutral-100 border-neutral-500 border"
+                    : "bg-neutral-50 border-neutral-200 hover:bg-neutral-100"
                 } ${sev.color}`}
               >
                 {sev.name}
@@ -241,9 +241,9 @@ export default function AzureSentinelAlertsPage() {
       {/* Alert list */}
       <div className="space-y-3">
         {filteredAlerts.length === 0 && (
-          <Card className="bg-neutral-900 border-neutral-800">
+          <Card className="bg-white border-neutral-200">
             <CardContent className="p-8 text-center">
-              <AlertTriangle className="w-8 h-8 text-neutral-600 mx-auto mb-3" />
+              <AlertTriangle className="w-8 h-8 text-neutral-400 mx-auto mb-3" />
               <p className="text-sm text-neutral-500">No alerts match your filters</p>
             </CardContent>
           </Card>
@@ -256,7 +256,7 @@ export default function AzureSentinelAlertsPage() {
           return (
             <Card
               key={alert.id}
-              className="bg-neutral-900 border-neutral-800 hover:border-neutral-700 transition-colors cursor-pointer"
+              className="bg-white border-neutral-200 hover:border-neutral-200 transition-colors cursor-pointer"
               onClick={() => setExpandedAlert(isExpanded ? null : alert.id)}
             >
               <CardContent className="p-4">
@@ -265,12 +265,12 @@ export default function AzureSentinelAlertsPage() {
                   <div className={`mt-0.5 ${catMeta.color}`}>{catMeta.icon}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h4 className="text-sm font-semibold text-white truncate">{alert.title}</h4>
+                      <h4 className="text-sm font-semibold text-neutral-900 truncate">{alert.title}</h4>
                       <Badge variant="outline" className={`text-[10px] shrink-0 ${getSeverityColor(alert.severity)}`}>
                         {alert.severity}
                       </Badge>
                     </div>
-                    <p className="text-xs text-neutral-400 line-clamp-1 mb-2">{alert.description}</p>
+                    <p className="text-xs text-neutral-500 line-clamp-1 mb-2">{alert.description}</p>
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(alert.timestamp).toLocaleDateString()}</span>
                       <span className="flex items-center gap-1"><Server className="w-3 h-3" />{alert.source}</span>
@@ -280,7 +280,7 @@ export default function AzureSentinelAlertsPage() {
                     {alert.mitreTactics.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {alert.mitreTactics.slice(0, 3).map((t, i) => (
-                          <Badge key={i} variant="outline" className="text-[10px] bg-purple-500/10 border-purple-500/30 text-purple-400">
+                          <Badge key={i} variant="outline" className="text-[10px] bg-purple-50 border-purple-200 text-purple-600">
                             {t}
                           </Badge>
                         ))}
@@ -295,24 +295,24 @@ export default function AzureSentinelAlertsPage() {
 
                 {/* Expanded details */}
                 {isExpanded && (
-                  <div className="mt-4 pt-4 border-t border-neutral-800 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="mt-4 pt-4 border-t border-neutral-200 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <h5 className="text-xs font-semibold text-neutral-400 uppercase mb-2">Technical Details</h5>
+                      <h5 className="text-xs font-semibold text-neutral-500 mb-2">Technical Details</h5>
                       <div className="space-y-1.5 text-xs">
-                        <div className="flex justify-between"><span className="text-neutral-500">Platform</span><span className="text-white">{alert.platform}</span></div>
-                        <div className="flex justify-between"><span className="text-neutral-500">Category</span><span className="text-white capitalize">{alert.category}</span></div>
-                        <div className="flex justify-between"><span className="text-neutral-500">Source</span><span className="text-white">{alert.source}</span></div>
-                        <div className="flex justify-between"><span className="text-neutral-500">Confidence</span><span className="text-white">{alert.confidence ?? "N/A"}%</span></div>
-                        <div className="flex justify-between"><span className="text-neutral-500">Status</span><span className="text-white">{alert.status ?? "Resolved"}</span></div>
+                        <div className="flex justify-between"><span className="text-neutral-500">Platform</span><span className="text-neutral-900">{alert.platform}</span></div>
+                        <div className="flex justify-between"><span className="text-neutral-500">Category</span><span className="text-neutral-900 capitalize">{alert.category}</span></div>
+                        <div className="flex justify-between"><span className="text-neutral-500">Source</span><span className="text-neutral-900">{alert.source}</span></div>
+                        <div className="flex justify-between"><span className="text-neutral-500">Confidence</span><span className="text-neutral-900">{alert.confidence ?? "N/A"}%</span></div>
+                        <div className="flex justify-between"><span className="text-neutral-500">Status</span><span className="text-neutral-900">{alert.status ?? "Resolved"}</span></div>
                       </div>
                     </div>
 
                     {alert.affectedEntities.length > 0 && (
                       <div>
-                        <h5 className="text-xs font-semibold text-neutral-400 uppercase mb-2">Affected Entities</h5>
+                        <h5 className="text-xs font-semibold text-neutral-500 mb-2">Affected Entities</h5>
                         <div className="flex flex-wrap gap-1">
                           {alert.affectedEntities.map((e, i) => (
-                            <Badge key={i} variant="outline" className="text-[10px] bg-blue-500/10 border-blue-500/30 text-blue-400">{e}</Badge>
+                            <Badge key={i} variant="outline" className="text-[10px] bg-blue-50 border-blue-200 text-blue-600">{e}</Badge>
                           ))}
                         </div>
                       </div>
@@ -320,10 +320,10 @@ export default function AzureSentinelAlertsPage() {
 
                     {alert.iocIndicators.length > 0 && (
                       <div>
-                        <h5 className="text-xs font-semibold text-neutral-400 uppercase mb-2">IOC Indicators</h5>
+                        <h5 className="text-xs font-semibold text-neutral-500 mb-2">IOC Indicators</h5>
                         <div className="space-y-1">
                           {alert.iocIndicators.map((ioc, i) => (
-                            <div key={i} className="text-xs font-mono text-red-400 bg-red-500/10 px-2 py-1 rounded">{ioc}</div>
+                            <div key={i} className="text-xs tabular-nums text-red-600 bg-red-50 px-2 py-1 rounded">{ioc}</div>
                           ))}
                         </div>
                       </div>
@@ -331,11 +331,11 @@ export default function AzureSentinelAlertsPage() {
 
                     {alert.remediationSteps.length > 0 && (
                       <div>
-                        <h5 className="text-xs font-semibold text-neutral-400 uppercase mb-2">Remediation</h5>
+                        <h5 className="text-xs font-semibold text-neutral-500 mb-2">Remediation</h5>
                         <div className="space-y-1">
                           {alert.remediationSteps.map((step, i) => (
-                            <div key={i} className="text-xs text-neutral-300 flex items-start gap-2">
-                              <span className="text-green-400 mt-0.5">•</span>{step}
+                            <div key={i} className="text-xs text-neutral-700 flex items-start gap-2">
+                              <span className="text-green-600 mt-0.5">•</span>{step}
                             </div>
                           ))}
                         </div>
@@ -344,8 +344,8 @@ export default function AzureSentinelAlertsPage() {
 
                     {/* Raw log */}
                     <div className="md:col-span-2">
-                      <h5 className="text-xs font-semibold text-neutral-400 uppercase mb-2">Raw Log</h5>
-                      <div className="bg-neutral-800 p-3 rounded text-xs font-mono text-neutral-300 overflow-x-auto max-h-48">
+                      <h5 className="text-xs font-semibold text-neutral-500 mb-2">Raw Log</h5>
+                      <div className="bg-neutral-50 p-3 rounded text-xs tabular-nums text-neutral-700 overflow-x-auto max-h-48">
                         <pre>{JSON.stringify(alert.rawLog, null, 2)}</pre>
                       </div>
                     </div>
@@ -364,7 +364,7 @@ export default function AzureSentinelAlertsPage() {
             variant="outline"
             size="sm"
             onClick={() => setMaxVisible((v) => v + 20)}
-            className="text-xs text-neutral-400"
+            className="text-xs text-neutral-500"
           >
             Load more ({filteredAlerts.length - maxVisible} remaining)
           </Button>

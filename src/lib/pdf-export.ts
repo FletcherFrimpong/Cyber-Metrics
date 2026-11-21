@@ -10,6 +10,22 @@ export interface TrendsAnalyticsData {
     cloud: any[];
   };
   roiValue: number;
+  /** Risk-model output for the period. The report prints money figures only from here. */
+  metrics?: {
+    totalCostImpact: number;
+    totalInvestment: number;
+    netBenefit: number;
+    roi: number;
+    lossAvoidedLow?: number;
+    lossAvoidedHigh?: number;
+    roiLow?: number;
+    roiHigh?: number;
+    confirmedIncidents?: number;
+    unverifiedIncidents?: number;
+    confirmedShare?: number;
+    grossExposure?: number;
+    categoryBreakdown?: { category: string; incidents: number; lossAvoided: number }[];
+  };
   quarterlyData: any[];
   yearlyData: any[];
   kriMetrics: {
@@ -66,410 +82,130 @@ export const generateTrendsAnalyticsPDF = async (data: TrendsAnalyticsData): Pro
   }
 };
 
+const money = (n: number): string =>
+  `${n < 0 ? "-" : ""}$${Math.round(Math.abs(n)).toLocaleString("en-US")}`;
+
+const CATEGORY_NAMES: Record<string, string> = {
+  edr: "Endpoint (EDR)",
+  email: "Email",
+  network: "Network",
+  web: "Web",
+  cloud: "Cloud",
+};
+
+const esc = (v: unknown): string =>
+  String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+
+// Every figure in the report comes from the risk model or a count of the
+// period's alerts. Nothing here is a fixed or illustrative number.
 const generateBeautifulPDFContent = (data: TrendsAnalyticsData): string => {
-  const currentDate = new Date().toLocaleDateString();
-  const totalAlerts = data.timeframeAlerts.edr.length + data.timeframeAlerts.email.length + 
-                     data.timeframeAlerts.network.length + data.timeframeAlerts.web.length + 
-                     data.timeframeAlerts.cloud.length;
-  const criticalAlerts = data.timeframeAlerts.edr.filter((a: any) => a.severity === "Critical").length +
-                        data.timeframeAlerts.email.filter((a: any) => a.severity === "Critical").length +
-                        data.timeframeAlerts.network.filter((a: any) => a.severity === "Critical").length +
-                        data.timeframeAlerts.web.filter((a: any) => a.severity === "Critical").length +
-                        data.timeframeAlerts.cloud.filter((a: any) => a.severity === "Critical").length;
-  
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>SignalFoundry - Executive Security Report</title>
-      <style>
-        @media print {
-          @page {
-            margin: 0.3in;
-            size: A4;
-          }
-          
-          body { 
-            margin: 0; 
-            padding: 0; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            font-size: 10px;
-            line-height: 1.3;
-            color: #2c3e50;
-            background: white;
-          }
-          
-          .header { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 20px;
-            text-align: center;
-            margin-bottom: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-          }
-          
-          .header h1 {
-            font-size: 20px;
-            font-weight: 300;
-            margin: 0 0 5px 0;
-            letter-spacing: 1px;
-          }
-          
-          .header .subtitle {
-            font-size: 12px;
-            opacity: 0.9;
-            margin: 0;
-          }
-          
-          .header .date {
-            font-size: 10px;
-            opacity: 0.8;
-            margin-top: 5px;
-          }
-          
-          .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-bottom: 15px;
-          }
-          
-          .section { 
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.05);
-            border: 1px solid #e9ecef;
-          }
-          
-          .section-title { 
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-            font-size: 12px; 
-            font-weight: 600; 
-            margin: 0;
-            padding: 8px 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-          }
-          
-          .section-content {
-            padding: 12px;
-          }
-          
-          .metric-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            margin-bottom: 10px;
-          }
-          
-          .metric-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 10px;
-            border-radius: 6px;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          }
-          
-          .metric-card.positive {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-          }
-          
-          .metric-card.warning {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-          }
-          
-          .metric-card.info {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-          }
-          
-          .metric-value {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 2px;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
-          }
-          
-          .metric-label {
-            font-size: 9px;
-            font-weight: 500;
-            opacity: 0.9;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-          }
-          
-          .table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-bottom: 10px; 
-            font-size: 8px;
-            background: white;
-            border-radius: 4px;
-            overflow: hidden;
-          }
-          
-          .table th, .table td { 
-            padding: 6px 8px; 
-            text-align: left; 
-            border-bottom: 1px solid #e9ecef;
-          }
-          
-          .table th { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-weight: 600; 
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            font-size: 7px;
-          }
-          
-          .table tr:nth-child(even) {
-            background-color: #f8f9fa;
-          }
-          
-          .status-badge {
-            padding: 2px 4px;
-            border-radius: 8px;
-            font-size: 7px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-          }
-          
-          .status-excellent {
-            background: #d4edda;
-            color: #155724;
-          }
-          
-          .status-good {
-            background: #d1ecf1;
-            color: #0c5460;
-          }
-          
-          .status-warning {
-            background: #fff3cd;
-            color: #856404;
-          }
-          
-          .status-danger {
-            background: #f8d7da;
-            color: #721c24;
-          }
-          
-          .footer { 
-            margin-top: 15px; 
-            text-align: center; 
-            font-size: 8px; 
-            color: #6c757d;
-            padding: 10px;
-            border-top: 1px solid #e9ecef;
-          }
-          
-          .highlight-box {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 10px;
-            border-radius: 6px;
-            margin: 10px 0;
-            text-align: center;
-          }
-          
-          .highlight-box h3 {
-            margin: 0 0 5px 0;
-            font-size: 11px;
-            font-weight: 600;
-          }
-          
-          .highlight-box p {
-            margin: 0;
-            opacity: 0.9;
-            font-size: 9px;
-          }
-          
-          .compact-metrics {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
-            margin-bottom: 10px;
-          }
-          
-          .compact-metric {
-            background: #f8f9fa;
-            padding: 6px;
-            border-radius: 4px;
-            text-align: center;
-            border: 1px solid #e9ecef;
-          }
-          
-          .compact-metric .value {
-            font-size: 14px;
-            font-weight: 700;
-            color: #2c3e50;
-          }
-          
-          .compact-metric .label {
-            font-size: 7px;
-            color: #6c757d;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-          }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h1>SIGNALFOUNDRY</h1>
-        <p class="subtitle">Executive Security Report</p>
-        <p class="date">${data.timeView === "quarterly" ? data.selectedQuarter : "Yearly Analysis"} • ${currentDate}</p>
-      </div>
+  const generated = new Date().toLocaleDateString();
+  const period = data.timeView === "yearly" ? `Year ${data.selectedQuarter.split(" ")[1] || ""}` : data.selectedQuarter;
+  const m = data.metrics;
 
-      <div class="main-grid">
-        <!-- Left Column -->
-        <div class="section">
-          <h2 class="section-title">Key Metrics</h2>
-          <div class="section-content">
-            <div class="metric-grid">
-              <div class="metric-card positive">
-                <div class="metric-value">${data.roiValue}%</div>
-                <div class="metric-label">ROI</div>
-              </div>
-              <div class="metric-card info">
-                <div class="metric-value">${totalAlerts}</div>
-                <div class="metric-label">Alerts</div>
-              </div>
-              <div class="metric-card warning">
-                <div class="metric-value">${criticalAlerts}</div>
-                <div class="metric-label">Critical</div>
-              </div>
-              <div class="metric-card info">
-                <div class="metric-value">${data.timeframeAlerts.edr.length}</div>
-                <div class="metric-label">EDR</div>
-              </div>
-            </div>
-            
-            <div class="highlight-box">
-              <h3>Key Insight</h3>
-              <p>${data.roiValue}% ROI • ${totalAlerts} threats blocked • ${criticalAlerts} critical alerts</p>
-            </div>
-          </div>
-        </div>
+  const categories = (Object.keys(CATEGORY_NAMES) as (keyof TrendsAnalyticsData["timeframeAlerts"])[]).map((key) => {
+    const alerts = data.timeframeAlerts[key] || [];
+    const count = (sev: string) => alerts.filter((a: any) => a.severity === sev).length;
+    return {
+      key,
+      name: CATEGORY_NAMES[key],
+      total: alerts.length,
+      critical: count("Critical"),
+      high: count("High"),
+      medium: count("Medium"),
+      low: count("Low"),
+      lossAvoided: m?.categoryBreakdown?.find((c) => c.category === key)?.lossAvoided,
+    };
+  });
+  const totalAlerts = categories.reduce((sum, c) => sum + c.total, 0);
 
-        <!-- Right Column -->
-        <div class="section">
-          <h2 class="section-title">Risk Indicators</h2>
-          <div class="section-content">
-            <div class="compact-metrics">
-              <div class="compact-metric">
-                <div class="value">${data.kriMetrics.threatVolume}%</div>
-                <div class="label">Threat Volume</div>
-              </div>
-              <div class="compact-metric">
-                <div class="value">${data.kriMetrics.costEfficiency}%</div>
-                <div class="label">Cost Efficiency</div>
-              </div>
-              <div class="compact-metric">
-                <div class="value">${data.kriMetrics.detectionAccuracy}%</div>
-                <div class="label">Detection</div>
-              </div>
-              <div class="compact-metric">
-                <div class="value">${data.kriMetrics.responseTime}%</div>
-                <div class="label">Response</div>
-              </div>
-            </div>
-            
-            <table class="table">
-              <thead>
-                <tr>
-                  <th>Metric</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>Threat Volume</td>
-                  <td><span class="status-badge ${data.kriMetrics.threatVolume < 50 ? 'status-excellent' : data.kriMetrics.threatVolume < 80 ? 'status-warning' : 'status-danger'}">${data.kriMetrics.threatVolume < 50 ? 'Low' : data.kriMetrics.threatVolume < 80 ? 'Medium' : 'High'}</span></td>
-                </tr>
-                <tr>
-                  <td>Cost Efficiency</td>
-                  <td><span class="status-badge ${data.kriMetrics.costEfficiency > 80 ? 'status-excellent' : data.kriMetrics.costEfficiency > 60 ? 'status-good' : 'status-warning'}">${data.kriMetrics.costEfficiency > 80 ? 'Excellent' : data.kriMetrics.costEfficiency > 60 ? 'Good' : 'Review'}</span></td>
-                </tr>
-                <tr>
-                  <td>ROI</td>
-                  <td><span class="status-badge ${data.kriMetrics.roi > 0 ? 'status-excellent' : 'status-danger'}">${data.kriMetrics.roi > 0 ? 'Positive' : 'Negative'}</span></td>
-                </tr>
-                <tr>
-                  <td>Coverage Gap</td>
-                  <td><span class="status-badge ${data.kriMetrics.coverageGap < 20 ? 'status-excellent' : 'status-warning'}">${data.kriMetrics.coverageGap < 20 ? 'Low' : 'High'}</span></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+  const stat = (label: string, value: string, note = "") => `
+    <div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div><div class="note">${esc(note)}</div></div>`;
 
-      <!-- Bottom Section -->
-      <div class="section">
-        <h2 class="section-title">Security Alert Summary</h2>
-        <div class="section-content">
-          ${(() => {
-            const categories = [
-              { name: 'EDR', data: data.timeframeAlerts.edr },
-              { name: 'Email', data: data.timeframeAlerts.email },
-              { name: 'Network', data: data.timeframeAlerts.network },
-              { name: 'Web', data: data.timeframeAlerts.web },
-              { name: 'Cloud', data: data.timeframeAlerts.cloud }
-            ];
-            
-            const categoriesWithData = categories.filter(category => category.data.length > 0);
-            
-            if (categoriesWithData.length === 0) {
-              return '<p style="text-align: center; font-style: italic; color: #6c757d; font-size: 9px;">No security alerts detected - secure environment</p>';
-            }
-            
-            return `
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    <th>Total</th>
-                    <th>Critical</th>
-                    <th>High</th>
-                    <th>Medium</th>
-                    <th>Low</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${categoriesWithData.map(category => {
-                    const critical = category.data.filter((a: any) => a.severity === "Critical").length;
-                    const high = category.data.filter((a: any) => a.severity === "High").length;
-                    const medium = category.data.filter((a: any) => a.severity === "Medium").length;
-                    const low = category.data.filter((a: any) => a.severity === "Low").length;
-                    
-                    return `
-                      <tr>
-                        <td><strong>${category.name}</strong></td>
-                        <td>${category.data.length}</td>
-                        <td>${critical > 0 ? `<span class="status-badge status-danger">${critical}</span>` : '0'}</td>
-                        <td>${high > 0 ? `<span class="status-badge status-warning">${high}</span>` : '0'}</td>
-                        <td>${medium > 0 ? `<span class="status-badge status-good">${medium}</span>` : '0'}</td>
-                        <td>${low > 0 ? `<span class="status-badge status-excellent">${low}</span>` : '0'}</td>
-                      </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
-            `;
-          })()}
-        </div>
-      </div>
+  const summary = m
+    ? `<div class="stats">
+        ${stat("Expected loss avoided", money(m.totalCostImpact), m.lossAvoidedLow !== undefined && m.lossAvoidedHigh !== undefined ? `Likely range ${money(m.lossAvoidedLow)} to ${money(m.lossAvoidedHigh)}` : "")}
+        ${stat("Security investment", money(m.totalInvestment), "Annual spend prorated to this period")}
+        ${stat("Net benefit", money(m.netBenefit), "Loss avoided minus investment")}
+        ${stat("ROI", `${m.roi.toLocaleString("en-US")}%`, m.roiLow !== undefined && m.roiHigh !== undefined ? `Range ${m.roiLow.toLocaleString("en-US")}% to ${m.roiHigh.toLocaleString("en-US")}%` : "")}
+      </div>`
+    : "";
 
-      <div class="footer">
-        <p><strong>SignalFoundry - Cybersecurity Analytics Platform</strong> • Generated ${currentDate}</p>
-      </div>
-    </body>
-    </html>
-  `;
+  const basis = m && m.confirmedIncidents !== undefined
+    ? `<h2>Basis</h2>
+       <table>
+         <tr><td>Incidents counted</td><td class="num">${((m.confirmedIncidents || 0) + (m.unverifiedIncidents || 0)).toLocaleString("en-US")}</td></tr>
+         <tr><td>Confirmed true positive by an analyst</td><td class="num">${(m.confirmedIncidents || 0).toLocaleString("en-US")}</td></tr>
+         <tr><td>Counted without an analyst verdict (weighted by tool confidence)</td><td class="num">${(m.unverifiedIncidents || 0).toLocaleString("en-US")}</td></tr>
+         <tr><td>Share of loss avoided resting on analyst-confirmed incidents</td><td class="num">${m.confirmedShare ?? 0}%</td></tr>
+         ${m.grossExposure !== undefined ? `<tr><td>Gross exposure (if every counted incident had escalated)</td><td class="num">${money(m.grossExposure)}</td></tr>` : ""}
+       </table>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>SignalFoundry - Executive Security Report - ${esc(period)}</title>
+  <style>
+    @page { margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 12px; line-height: 1.45; color: #171717; margin: 0; }
+    header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #e5e5e5; padding-bottom: 10px; margin-bottom: 16px; }
+    header .brand { font-size: 13px; font-weight: 600; }
+    header .meta { font-size: 11px; color: #737373; }
+    h1 { font-size: 20px; font-weight: 600; margin: 0 0 2px; }
+    .period { color: #737373; margin-bottom: 16px; }
+    h2 { font-size: 13px; font-weight: 600; margin: 20px 0 6px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #e5e5e5; border-radius: 6px; overflow: hidden; }
+    .stat { padding: 10px 12px; border-right: 1px solid #e5e5e5; }
+    .stat:last-child { border-right: 0; }
+    .label { font-size: 11px; color: #737373; }
+    .value { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .note { font-size: 10.5px; color: #a3a3a3; margin-top: 2px; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid #e5e5e5; }
+    th { text-align: left; font-weight: 400; font-size: 11px; color: #737373; background: #fafafa; padding: 6px 10px; border-bottom: 1px solid #e5e5e5; }
+    td { padding: 6px 10px; border-bottom: 1px solid #f5f5f5; }
+    tr:last-child td { border-bottom: 0; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .method { color: #525252; font-size: 11px; margin-top: 6px; }
+    footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #e5e5e5; font-size: 10.5px; color: #a3a3a3; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">Signal Foundry</div>
+    <div class="meta">Generated ${esc(generated)}</div>
+  </header>
+
+  <h1>Executive Security Report</h1>
+  <div class="period">${esc(period)} · ${totalAlerts.toLocaleString("en-US")} alerts from resolved incidents</div>
+
+  ${summary}
+  ${basis}
+
+  <h2>Alerts by category</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Category</th><th class="num">Alerts</th><th class="num">Critical</th><th class="num">High</th><th class="num">Medium</th><th class="num">Low</th>${m ? '<th class="num">Loss avoided</th>' : ""}
+      </tr>
+    </thead>
+    <tbody>
+      ${categories.map((c) => `
+      <tr>
+        <td>${esc(c.name)}</td>
+        <td class="num">${c.total.toLocaleString("en-US")}</td>
+        <td class="num">${c.critical}</td><td class="num">${c.high}</td><td class="num">${c.medium}</td><td class="num">${c.low}</td>
+        ${m ? `<td class="num">${c.lossAvoided !== undefined ? money(c.lossAvoided) : "—"}</td>` : ""}
+      </tr>`).join("")}
+    </tbody>
+  </table>
+
+  ${m ? `<h2>How the figures are calculated</h2>
+  <p class="method">Each incident's loss avoided is the chance it was a real attack, times the chance it would have escalated had it not been contained (set by the furthest MITRE ATT&amp;CK stage observed), times an industry benchmark loss for its category and severity. Incidents an analyst classified as false or benign positives are excluded. The range is the 5th to 95th percentile of a 5,000-trial simulation. Escalation probabilities are model assumptions and should be calibrated to your organisation.</p>` : ""}
+
+  <footer>Signal Foundry · Cyber Risk Quantification Platform · ${esc(period)}</footer>
+</body>
+</html>`;
 };

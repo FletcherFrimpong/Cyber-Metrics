@@ -154,8 +154,8 @@ export default function LoginPage() {
 
   if (needsSetup === null) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-neutral-900 animate-spin" />
       </div>
     );
   }
@@ -179,30 +179,30 @@ export default function LoginPage() {
   const onSubmit = isSetup ? handleSetup : isSignup ? handleSignup : handleLogin;
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-4">
+    <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-orange-500/10 border border-orange-500/20 mb-4">
-            <Shield className="w-8 h-8 text-orange-500" />
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-neutral-100 border border-neutral-200 mb-4">
+            <Shield className="w-8 h-8 text-neutral-900" />
           </div>
-          <h1 className="text-orange-500 font-bold text-2xl tracking-wider">
+          <h1 className="text-neutral-900 font-bold text-2xl">
             SIGNAL FOUNDRY
           </h1>
-          <p className="text-neutral-500 text-xs mt-1 tracking-wide">
+          <p className="text-neutral-500 text-xs mt-1">
             Cyber Risk Quantification Platform
           </p>
         </div>
 
         {/* Tab switcher — hidden during first-run setup */}
         {!isSetup && (
-          <div className="flex mb-6 bg-neutral-900 border border-neutral-700 rounded-lg p-1">
+          <div className="flex mb-6 bg-white border border-neutral-200 rounded-lg p-1">
             <button
               onClick={() => switchMode("login")}
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
                 isLogin
-                  ? "bg-orange-600 text-white"
-                  : "text-neutral-400 hover:text-white"
+                  ? "bg-neutral-900 text-white"
+                  : "text-neutral-500 hover:text-neutral-900"
               }`}
             >
               Sign In
@@ -211,8 +211,8 @@ export default function LoginPage() {
               onClick={() => switchMode("signup")}
               className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
                 isSignup
-                  ? "bg-orange-600 text-white"
-                  : "text-neutral-400 hover:text-white"
+                  ? "bg-neutral-900 text-white"
+                  : "text-neutral-500 hover:text-neutral-900"
               }`}
             >
               Sign Up
@@ -221,12 +221,12 @@ export default function LoginPage() {
         )}
 
         {/* Card */}
-        <div className="bg-neutral-900 border border-neutral-700 rounded-lg p-8">
-          <h2 className="text-white text-lg font-semibold mb-1">{heading}</h2>
+        <div className="bg-white border border-neutral-200 rounded-lg p-8">
+          <h2 className="text-neutral-900 text-lg font-semibold mb-1">{heading}</h2>
           <p className="text-neutral-500 text-sm mb-6">{subtitle}</p>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-md text-red-400 text-sm">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-red-600 text-sm">
               {error}
             </div>
           )}
@@ -234,7 +234,7 @@ export default function LoginPage() {
           <form onSubmit={onSubmit}>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-neutral-400 mb-1.5">
+                <label className="block text-sm text-neutral-500 mb-1.5">
                   Username
                 </label>
                 <Input
@@ -245,14 +245,14 @@ export default function LoginPage() {
                   required
                   autoFocus
                   autoComplete="username"
-                  className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-600 focus-visible:ring-orange-500/50 focus-visible:border-orange-500"
+                  className="bg-neutral-50 border-neutral-300 text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-orange-500/50 focus-visible:border-neutral-900"
                 />
               </div>
 
               {(isSignup || isSetup) && (
                 <>
                   <div>
-                    <label className="block text-sm text-neutral-400 mb-1.5">
+                    <label className="block text-sm text-neutral-500 mb-1.5">
                       Display Name
                     </label>
                     <Input
@@ -260,11 +260,11 @@ export default function LoginPage() {
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
                       placeholder="Your full name"
-                      className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-600 focus-visible:ring-orange-500/50 focus-visible:border-orange-500"
+                      className="bg-neutral-50 border-neutral-300 text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-orange-500/50 focus-visible:border-neutral-900"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-neutral-400 mb-1.5">
+                    <label className="block text-sm text-neutral-500 mb-1.5">
                       Email
                     </label>
                     <Input
@@ -272,14 +272,14 @@ export default function LoginPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       placeholder={isSetup ? "admin@company.com" : "you@company.com"}
-                      className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-600 focus-visible:ring-orange-500/50 focus-visible:border-orange-500"
+                      className="bg-neutral-50 border-neutral-300 text-neutral-900 placeholder:text-neutral-400 focus-visible:ring-orange-500/50 focus-visible:border-neutral-900"
                     />
                   </div>
                 </>
               )}
 
               <div>
-                <label className="block text-sm text-neutral-400 mb-1.5">
+                <label className="block text-sm text-neutral-500 mb-1.5">
                   Password
                 </label>
                 <div className="relative">
@@ -291,12 +291,12 @@ export default function LoginPage() {
                     required
                     minLength={isLogin ? undefined : 8}
                     autoComplete={isLogin ? "current-password" : "new-password"}
-                    className="bg-neutral-800 border-neutral-600 text-white placeholder:text-neutral-600 pr-10 focus-visible:ring-orange-500/50 focus-visible:border-orange-500"
+                    className="bg-neutral-50 border-neutral-300 text-neutral-900 placeholder:text-neutral-400 pr-10 focus-visible:ring-orange-500/50 focus-visible:border-neutral-900"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
                   >
                     {showPassword ? (
                       <EyeOff className="w-4 h-4" />
@@ -311,7 +311,7 @@ export default function LoginPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full mt-6 bg-orange-600 hover:bg-orange-700 text-white font-medium"
+              className="w-full mt-6 bg-neutral-900 hover:bg-neutral-800 text-white font-medium"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -335,7 +335,7 @@ export default function LoginPage() {
           </form>
 
           {isSignup && (
-            <p className="text-neutral-600 text-xs text-center mt-4">
+            <p className="text-neutral-400 text-xs text-center mt-4">
               New accounts are created with viewer (read-only) access.
               An admin can upgrade your role later.
             </p>
@@ -343,7 +343,7 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-neutral-700 text-xs text-center mt-6">
+        <p className="text-neutral-300 text-xs text-center mt-6">
           SignalFoundry v1.0 &mdash; Secure Access
         </p>
       </div>

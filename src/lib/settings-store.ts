@@ -25,12 +25,15 @@ export interface AppSettings {
     pollingIntervalMs: number;
   } | null;
   smtp: SmtpSettings | null;
+  /** Per-connector credentials, keyed by connector id. See src/lib/connectors. */
+  connectors: Record<string, Record<string, string>>;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   investmentAmount: 0,
   sentinel: null,
   smtp: null,
+  connectors: {},
 };
 
 function ensureDataDir() {
@@ -77,6 +80,26 @@ if (!g.__sfSettings) {
 
 export function getSettings(): AppSettings {
   return g.__sfSettings as AppSettings;
+}
+
+/** Save or remove (config = null) one connector's credentials. Masked secrets keep the stored value. */
+export function updateConnector(id: string, config: Record<string, string> | null): Record<string, string> | null {
+  const current = getSettings();
+  if (!current.connectors) current.connectors = {};
+  if (config === null) {
+    delete current.connectors[id];
+  } else {
+    const existing = current.connectors[id] || {};
+    const merged: Record<string, string> = { ...existing };
+    for (const [key, value] of Object.entries(config)) {
+      if (value === "••••••••") continue; // unchanged secret
+      merged[key] = String(value ?? "").trim();
+    }
+    current.connectors[id] = merged;
+  }
+  g.__sfSettings = current;
+  saveToDisk(current);
+  return current.connectors[id] ?? null;
 }
 
 export function updateSettings(partial: Partial<AppSettings>): AppSettings {

@@ -1,15 +1,40 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronRight, Target, RefreshCw, FileText, AlertTriangle, Calendar, BarChart3, Settings, LogOut, User, Users } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Target, RefreshCw, FileText, Calendar, BarChart3, Settings, LogOut, User, Users, PanelLeft, LayoutDashboard, Wallet } from "lucide-react"
 import TrendsAnalytics from "@/components/trends-analytics"
 import { TacticalDashboardLayout } from "@/components/tactical-dashboard-layout"
+import ExecutiveReport from "@/app/executive-reports/page"
 import SettingsPage from "@/components/settings-page"
 import UserManagement from "@/components/user-management"
 import ErrorBoundary from "@/components/debug-error-boundary"
 import { useAuth } from "@/components/auth-provider"
 
+
+type NavItem = {
+  id: string
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  permission: "dashboard:view" | "reports:view" | "settings:view" | "users:manage"
+}
+
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Reports",
+    items: [
+      { id: "trends-analytics", icon: LayoutDashboard, label: "Trends & analytics", permission: "dashboard:view" },
+      { id: "executive-reports", icon: FileText, label: "Executive reports", permission: "reports:view" },
+      { id: "security-report", icon: Wallet, label: "Executive security report", permission: "reports:view" },
+    ],
+  },
+  {
+    label: "Workspace",
+    items: [
+      { id: "settings", icon: Settings, label: "Settings", permission: "settings:view" },
+      { id: "user-management", icon: Users, label: "User management", permission: "users:manage" },
+    ],
+  },
+]
 
 export default function HomePage() {
   const { user, hasPermission, logout } = useAuth()
@@ -28,25 +53,19 @@ export default function HomePage() {
 
   const [selectedQuarter, setSelectedQuarter] = useState<string>(getCurrentQuarter())
   const [lastUpdate, setLastUpdate] = useState<string>("")
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Update timestamp on mount and when quarter or view changes
   useEffect(() => {
     setLastUpdate(new Date().toLocaleString());
-  }, [selectedQuarter, timeView, activeSection]);
+  }, [selectedQuarter, timeView, activeSection, refreshKey]);
 
   // Set initial timestamp on client only (avoids hydration mismatch)
   useEffect(() => {
     setLastUpdate(new Date().toLocaleString());
   }, []);
 
-  const allNavItems = [
-    { id: "executive-reports", icon: FileText, label: "EXECUTIVE REPORTS", permission: "reports:view" as const },
-    { id: "trends-analytics", icon: Target, label: "TRENDS & ANALYTICS", permission: "dashboard:view" as const },
-    { id: "user-management", icon: Users, label: "USER MANAGEMENT", permission: "users:manage" as const },
-    { id: "settings", icon: Settings, label: "SETTINGS", permission: "settings:view" as const },
-  ]
-
-  const navItems = allNavItems.filter((item) => hasPermission(item.permission))
+  const navItems = NAV_GROUPS.reduce<NavItem[]>((all, g) => all.concat(g.items), []).filter((item) => hasPermission(item.permission))
 
   // Generate quarterly data dynamically based on current date - Show only current 4 quarters
   const generateQuarterlyData = () => {
@@ -88,6 +107,10 @@ export default function HomePage() {
       return <TacticalDashboardLayout selectedQuarter={selectedQuarter} timeView={timeView} />
     }
 
+    if (activeSection === "security-report") {
+      return <ExecutiveReport selectedQuarter={selectedQuarter} timeView={timeView} />
+    }
+
     if (activeSection === "user-management") {
       return <UserManagement />
     }
@@ -100,149 +123,152 @@ export default function HomePage() {
     return <TrendsAnalytics timeView={timeView} selectedQuarter={selectedQuarter} />
   }
 
+  const activeItem = navItems.find((item) => item.id === activeSection) ?? navItems[0]
+  const showPeriod = activeSection !== "settings" && activeSection !== "user-management"
+  const year = selectedQuarter.split(" ")[1]
+
   return (
     <ErrorBoundary>
-      <div className="flex h-screen">
-      {/* Sidebar */}
-      <div
-        className={`${sidebarCollapsed ? "w-16" : "w-70"} bg-neutral-900 border-r border-neutral-700 transition-all duration-300 fixed md:relative z-50 md:z-auto h-full md:h-auto ${!sidebarCollapsed ? "md:block" : ""}`}
-      >
-        <div className="p-4">
-          <div className="flex items-center justify-between mb-8">
-            <div className={`${sidebarCollapsed ? "hidden" : "block"}`}>
-              <h1 className="text-orange-500 font-bold text-lg tracking-wider">SIGNAL FOUNDRY</h1>
-                                        <p className="text-neutral-500 text-xs">Cyber Risk Quantification Platform</p>
+      <div className="flex h-screen bg-white text-neutral-900">
+        {/* Sidebar */}
+        {!sidebarCollapsed && (
+          <aside className="w-56 shrink-0 flex flex-col bg-neutral-50 border-r border-neutral-200 fixed md:relative z-50 md:z-auto h-full">
+            <div className="h-12 flex items-center gap-2 px-3">
+              <div className="w-5 h-5 rounded bg-neutral-900 flex items-center justify-center">
+                <Target className="w-3 h-3 text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-[13px] font-semibold text-neutral-900 leading-tight">Signal Foundry</h1>
+              </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className="text-neutral-400 hover:text-orange-500"
-            >
-              <ChevronRight
-                className={`w-4 h-4 sm:w-5 sm:h-5 transition-transform ${sidebarCollapsed ? "" : "rotate-180"}`}
-              />
-            </Button>
-          </div>
+            <p className="px-3 -mt-1 mb-3 text-[11px] text-neutral-400">Cyber Risk Quantification Platform</p>
 
-          <nav className="space-y-2">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={`w-full flex items-center gap-3 p-3 rounded transition-colors ${
-                  activeSection === item.id
-                    ? "bg-orange-500 text-white"
-                    : "text-neutral-400 hover:text-white hover:bg-neutral-800"
-                }`}
-              >
-                <item.icon className="w-5 h-5 md:w-5 md:h-5 sm:w-6 sm:h-6" />
-                {!sidebarCollapsed && <span className="text-sm font-medium">{item.label}</span>}
-              </button>
-            ))}
-          </nav>
+            <nav className="flex-1 overflow-y-auto px-2 space-y-4">
+              {NAV_GROUPS.map((group) => {
+                const items = group.items.filter((item) => hasPermission(item.permission))
+                if (items.length === 0) return null
+                return (
+                  <div key={group.label}>
+                    <div className="px-2 mb-1 text-[11px] text-neutral-400">{group.label}</div>
+                    <div className="space-y-0.5">
+                      {items.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => setActiveSection(item.id)}
+                          className={`w-full flex items-center gap-2 h-7 px-2 rounded-md text-[13px] transition-colors ${
+                            activeSection === item.id
+                              ? "bg-neutral-200/70 text-neutral-900 font-medium"
+                              : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                          }`}
+                        >
+                          <item.icon className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">{item.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </nav>
 
-          {!sidebarCollapsed && (
-            <div className="mt-8 p-4 bg-neutral-800 border border-neutral-700 rounded">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs text-white">SYSTEM ONLINE</span>
+            <div className="p-2 border-t border-neutral-200">
+              <div className="flex items-center gap-2 px-2 h-7 text-[12px] text-neutral-500">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                System online
               </div>
               {user && (
-                <div className="mt-3 pt-3 border-t border-neutral-700">
-                  <div className="flex items-center gap-2 mb-2">
-                    <User className="w-3.5 h-3.5 text-neutral-400" />
-                    <span className="text-xs text-white truncate">{user.displayName}</span>
+                <>
+                  <div className="flex items-center gap-2 px-2 h-7 text-[13px] text-neutral-800">
+                    <User className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                    <span className="truncate">{user.displayName}</span>
+                    <span className="ml-auto text-[11px] text-neutral-400 capitalize">{user.role}</span>
                   </div>
-                  <div className="text-xs text-neutral-500 mb-3 uppercase">{user.role}</div>
                   <button
                     onClick={logout}
-                    className="flex items-center gap-2 text-xs text-neutral-500 hover:text-red-400 transition-colors w-full"
+                    className="w-full flex items-center gap-2 px-2 h-7 rounded-md text-[13px] text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
                   >
-                    <LogOut className="w-3.5 h-3.5" />
-                    Sign Out
+                    <LogOut className="w-3.5 h-3.5 shrink-0" />
+                    Sign out
                   </button>
-                </div>
+                </>
               )}
             </div>
-          )}
-        </div>
-      </div>
+          </aside>
+        )}
 
-      {/* Mobile Overlay */}
-      {!sidebarCollapsed && (
-        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setSidebarCollapsed(true)} />
-      )}
+        {/* Mobile Overlay */}
+        {!sidebarCollapsed && (
+          <div className="fixed inset-0 bg-black/20 z-40 md:hidden" onClick={() => setSidebarCollapsed(true)} />
+        )}
 
-      {/* Main Content */}
-      <div className={`flex-1 flex flex-col ${!sidebarCollapsed ? "md:ml-0" : ""}`}>
-        {/* Top Toolbar — hidden on settings page */}
-        {activeSection !== "settings" && activeSection !== "user-management" && (
-        <div className="h-16 bg-neutral-800 border-b border-neutral-700 flex items-center justify-between px-6">
-          {/* Left Section */}
-          <div className="flex items-center gap-6">
-            {/* Analysis Period Controls */}
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-neutral-300">Analysis Period:</span>
-              <div className="flex bg-neutral-800 rounded-md p-1">
-                <Button
-                  variant={timeView === "quarterly" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setTimeView("quarterly")}
-                  className="text-xs"
+        {/* Main Content */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* Title bar */}
+          <div className="h-12 shrink-0 flex items-center gap-2 px-3 border-b border-neutral-200">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              aria-label={sidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
+              className="w-7 h-7 flex items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+            >
+              <PanelLeft className="w-4 h-4" />
+            </button>
+            <span className="text-[13px] font-medium text-neutral-900">{activeItem?.label}</span>
+            {showPeriod && (
+              <div className="ml-auto flex items-center gap-2 text-[12px] text-neutral-400">
+                <span>Last update: {lastUpdate}</span>
+                <button
+                  onClick={() => setRefreshKey((k) => k + 1)}
+                  aria-label="Refresh data"
+                  className="w-7 h-7 flex items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
                 >
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Quarterly
-                </Button>
-                <Button
-                  variant={timeView === "yearly" ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setTimeView("yearly")}
-                  className="text-xs"
-                >
-                  <BarChart3 className="w-4 h-4 mr-2" />
-                  Yearly
-                </Button>
-              </div>
-            </div>
-
-            {/* Quarter Selection */}
-            {timeView === "quarterly" && (
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-neutral-300">Select Quarter:</span>
-                <select
-                  value={selectedQuarter}
-                  onChange={(e) => setSelectedQuarter(e.target.value)}
-                  className="bg-neutral-800 border border-neutral-700 rounded-md px-3 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  {quarterlyData.map((quarter) => (
-                    <option key={quarter.quarter} value={quarter.quarter}>
-                      {quarter.quarter}
-                    </option>
-                  ))}
-                </select>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
               </div>
             )}
           </div>
 
-          {/* Right Section */}
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="text-neutral-400 hover:text-orange-500">
-              <AlertTriangle className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="text-neutral-400 hover:text-orange-500">
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-            <div className="text-xs text-neutral-500 ml-8">LAST UPDATE: {lastUpdate}</div>
+          {/* Filter row: one period control for every report screen */}
+          {showPeriod && (
+            <div className="h-11 shrink-0 flex items-center gap-2 px-3 border-b border-neutral-200">
+              <label className="inline-flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md border border-neutral-200 bg-white text-[13px] text-neutral-800 hover:bg-neutral-50">
+                <BarChart3 className="w-3.5 h-3.5 text-neutral-500" />
+                <span className="sr-only">Analysis period</span>
+                <select
+                  value={timeView}
+                  onChange={(e) => setTimeView(e.target.value as "quarterly" | "yearly")}
+                  className="bg-transparent outline-none cursor-pointer"
+                >
+                  <option value="quarterly">Quarterly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </label>
+              <label className="inline-flex items-center gap-1.5 h-7 pl-2 pr-1 rounded-md border border-neutral-200 bg-white text-[13px] text-neutral-800 hover:bg-neutral-50">
+                <Calendar className="w-3.5 h-3.5 text-neutral-500" />
+                <span className="sr-only">{timeView === "quarterly" ? "Quarter" : "Year"}</span>
+                {timeView === "quarterly" ? (
+                  <select
+                    value={selectedQuarter}
+                    onChange={(e) => setSelectedQuarter(e.target.value)}
+                    className="bg-transparent outline-none cursor-pointer"
+                  >
+                    {quarterlyData.map((quarter) => (
+                      <option key={quarter.quarter} value={quarter.quarter}>
+                        {quarter.quarter}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="pr-1.5">{year}</span>
+                )}
+              </label>
+            </div>
+          )}
+
+          {/* Screen content */}
+          <div key={refreshKey} className="flex-1 overflow-auto p-3 bg-white">
+            {renderDashboardContent()}
           </div>
         </div>
-        )}
-
-        {/* Dashboard Content */}
-        <div className="flex-1 overflow-auto p-6">
-          {renderDashboardContent()}
-        </div>
-      </div>
       </div>
     </ErrorBoundary>
   )

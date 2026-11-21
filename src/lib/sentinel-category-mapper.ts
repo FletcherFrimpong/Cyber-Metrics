@@ -163,6 +163,8 @@ export interface GraphSecurityAlert {
   }[];
   recommendedActions?: string;
   confidence?: number;
+  classification?: string;            // truePositive, falsePositive, informationalExpectedActivity, unknown
+  determination?: string;
 }
 
 export interface SentinelIncident {
@@ -239,6 +241,8 @@ export function transformSentinelAlert(
       alertId: alert.id,
       classification: incident.classification,
       classificationReason: incident.classificationReason,
+      alertClassification: alert.classification,
+      alertDetermination: alert.determination,
       productName: alert.productName,
       Confidence: alert.confidence || null,
       incidentUrl: incident.incidentWebUrl,

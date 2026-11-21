@@ -1,31 +1,51 @@
 import edrDataService from "./edr-data-service";
+import type { SecurityAlert, CategorizedAlerts } from "@/types/alerts";
+import {
+  summariseRisk,
+  verdictFor,
+  unverifiedProbability,
+  type ModelAlert,
+  type RiskSummary,
+} from "./risk-model";
 
-// Centralized cost calculation system
-// All metrics are derived from actual alert data — no fabricated multipliers.
-// Flow: Get alerts (from Sentinel or sample) → Filter true positives → Sum their costImpact → Derive everything from that.
+// Centralized cost calculation system.
+// Flow: alerts (Sentinel or sample) → incidents → risk model → dashboard metrics.
+// See ./risk-model.ts for the model and its assumptions.
 
 export interface CostCalculationParams {
   period: "quarterly" | "yearly" | "monthly";
   selectedQuarter?: string;
-  investmentAmount?: number; // User-configured security investment
+  investmentAmount?: number; // User-configured ANNUAL security investment
+}
+
+export interface CategoryLossAvoided {
+  category: string;
+  incidents: number;
+  lossAvoided: number;
 }
 
 export interface CostMetrics {
   totalAlerts: number;
-  truePositiveCount: number;
-  falsePositiveCount: number;
+  truePositiveCount: number;     // Alerts in incidents that count toward loss avoided
+  falsePositiveCount: number;    // Alerts dismissed by an analyst or failing the quality gate
   truePositiveRate: number;
-  totalCostImpact: number;       // Sum of costImpact from true positive alerts
-  totalInvestment: number;       // Fixed EDR investment
-  totalCostSavings: number;      // costImpact - investment
-  breachPrevention: number;
-  complianceSavings: number;
-  insuranceSavings: number;
-  productivityGains: number;
-  regulatoryFines: number;
-  reputationDamage: number;
+  incidentCount: number;
+  confirmedIncidents: number;    // Analyst classified true positive
+  unverifiedIncidents: number;   // No analyst verdict; passed the gate, weighted by confidence
+  dismissedIncidents: number;
+  confirmedShare: number;        // % of loss avoided resting on analyst-confirmed incidents
+  grossExposure: number;         // Undiscounted benchmark sum — upper bound, not an estimate
+  totalCostImpact: number;       // Expected loss avoided (mean)
+  lossAvoidedLow: number;        // 5th percentile
+  lossAvoidedMedian: number;
+  lossAvoidedHigh: number;       // 95th percentile
+  categoryBreakdown: CategoryLossAvoided[];
+  totalInvestment: number;       // Annual investment prorated to the period
+  totalCostSavings: number;      // Loss avoided − investment (same as netBenefit)
   netBenefit: number;
   roi: number;
+  roiLow: number;
+  roiHigh: number;
 }
 
 // MITRE ATT&CK Framework validation for true positive analysis
@@ -312,168 +332,122 @@ const searchThreatActors = (techniques: string[]): ThreatActorInfo[] => {
   return matched.slice(0, 3);
 };
 
-// Investment amount is passed in via params from the calling component,
-// which fetches it from the /api/settings endpoint.
+// ─── RISK QUANTIFICATION ────────────────────────────────────────────────────
+// The model itself lives in ./risk-model.ts. This file feeds it alerts for the
+// selected period and turns its output into the metrics the dashboard shows.
 
-// ─── TRUE POSITIVE VALIDATION ───────────────────────────────────────────────
-// This is the core of the risk quantification.
-// An alert is a true positive if ANY of these conditions are met:
-//   1. Has valid MITRE technique(s) with avg risk >= 0.6 AND confidence >= 70%
-//   2. Severity is Critical/High (strong signal even without MITRE mapping)
-//   3. High confidence (>= 90%) regardless of MITRE (the detection tool is sure)
-//
-// This avoids penalizing alerts that lack MITRE data (common with newer products)
-// while still filtering out obvious noise (Low severity + no MITRE + low confidence).
+const isKnownTechnique = (id: string): boolean => !!MITRE_ATTACK_TECHNIQUES[id]?.isValidTechnique;
 
-function validateAlert(alert: any): { isValid: boolean; riskScore: number; techniques: string[] } {
-  const confidence = alert.confidence || alert.rawLog?.Confidence || 0;
+const BUCKETS = ["edr", "email", "network", "web", "cloud"] as const;
 
-  const techniques = alert.mitreTechniques || [];
-  const validTechniques: string[] = [];
-  let totalRisk = 0;
-
-  for (const t of techniques) {
-    // Handle sub-techniques like T1059.001 — look up the base technique too
-    const baseT = t.split('.')[0];
-    const entry = MITRE_ATTACK_TECHNIQUES[t] || MITRE_ATTACK_TECHNIQUES[baseT];
-    if (entry?.isValidTechnique) {
-      validTechniques.push(t);
-      totalRisk += entry.riskScore;
-    }
-  }
-
-  const avgRisk = validTechniques.length > 0 ? totalRisk / validTechniques.length : 0;
-  const hasMITRE = validTechniques.length > 0 && avgRisk >= 0.6;
-
-  // Path 1: MITRE-validated with reasonable confidence
-  const mitreValidated = hasMITRE && confidence >= 70;
-
-  // Path 2: High severity is a strong signal on its own
-  const highSeverity = alert.severity === "Critical" || alert.severity === "High";
-
-  // Path 3: Very high confidence from the detection tool
-  const highConfidence = confidence >= 90;
-
-  // Compute effective risk score for reporting
-  let effectiveRisk = avgRisk;
-  if (!hasMITRE && highSeverity) effectiveRisk = alert.severity === "Critical" ? 0.9 : 0.8;
-  if (!hasMITRE && highConfidence) effectiveRisk = Math.max(effectiveRisk, 0.75);
-
-  return {
-    isValid: mitreValidated || highSeverity || highConfidence,
-    riskScore: effectiveRisk,
-    techniques: validTechniques,
-  };
+function tag(data: CategorizedAlerts): ModelAlert[] {
+  return BUCKETS.flatMap(bucket => (data[bucket] || []).map(alert => ({ alert, bucket })));
 }
 
-// ─── GET ALERTS FOR A PERIOD ────────────────────────────────────────────────
 // Pulls all alerts (all categories) for the given period.
 // This is the SINGLE source of truth for all calculations.
-
-function getAlertsForPeriod(period: "quarterly" | "yearly" | "monthly", selectedQuarter: string): any[] {
-  // Uses the data service — which pulls from Sentinel if configured, sample data otherwise
+function getAlertsForPeriod(period: "quarterly" | "yearly" | "monthly", selectedQuarter: string): ModelAlert[] {
   if (period === "yearly") {
-    const year = selectedQuarter.split(" ")[1] || "2024";
-    const all: any[] = [];
+    const year = selectedQuarter.split(" ")[1] || String(new Date().getUTCFullYear());
+    const all: ModelAlert[] = [];
     for (let q = 1; q <= 4; q++) {
-      const data = edrDataService.getTimeframeAlerts(`Q${q} ${year}`);
-      all.push(...data.edr, ...data.email, ...data.network, ...data.web, ...data.cloud);
+      all.push(...tag(edrDataService.getTimeframeAlerts(`Q${q} ${year}`)));
     }
     return all;
   }
 
-  // Quarterly or monthly — get the selected quarter
-  const data = edrDataService.getTimeframeAlerts(selectedQuarter);
-  const all = [...data.edr, ...data.email, ...data.network, ...data.web, ...data.cloud];
+  const all = tag(edrDataService.getTimeframeAlerts(selectedQuarter));
 
   if (period === "monthly") {
-    // Approximate: take 1/3 of the quarter's alerts
-    return all.slice(0, Math.round(all.length / 3));
+    // The most recent calendar month in the quarter that has alerts.
+    const monthOf = (a: ModelAlert) => a.alert.timestamp.slice(0, 7); // YYYY-MM
+    const latest = all.reduce((m, a) => (monthOf(a) > m ? monthOf(a) : m), "");
+    return all.filter(a => monthOf(a) === latest);
   }
 
   return all;
 }
 
+// Investment is entered as an ANNUAL figure; compare like with like.
+const PERIOD_SHARE = { yearly: 1, quarterly: 1 / 4, monthly: 1 / 12 } as const;
+
+const roiPct = (lossAvoided: number, investment: number): number =>
+  investment > 0 ? Math.round(((lossAvoided - investment) / investment) * 100) : 0;
+
 // ─── MAIN CALCULATION: calculateCostMetrics ─────────────────────────────────
-// One unified function. Everything flows from the actual alert data.
-//
 // Pipeline:
-//   1. Get all alerts for the period
-//   2. Validate each alert (true positive filter)
-//   3. totalCostImpact = SUM(truePositive.costImpact)  ← the actual risk quantified
-//   4. totalCostSavings = totalCostImpact - investment
-//   5. ROI = totalCostSavings / investment × 100
-//   6. Breakdown = percentage allocation of savings by category
+//   1. Get all alerts for the period and group them into incidents
+//   2. Score each incident: P(real) × P(escalation) × benchmark loss
+//   3. totalCostImpact = expected loss avoided, with a 5th–95th percentile range
+//   4. ROI = (loss avoided − investment for the period) / investment
+
+export const calculateRiskSummary = (params: CostCalculationParams): RiskSummary => {
+  const { period, selectedQuarter = currentQuarterLabel() } = params;
+  return summariseRisk(getAlertsForPeriod(period, selectedQuarter), isKnownTechnique);
+};
 
 export const calculateCostMetrics = async (params: CostCalculationParams): Promise<CostMetrics> => {
-  const { period, selectedQuarter = "Q4 2024", investmentAmount = 0 } = params;
+  const { period, investmentAmount = 0 } = params;
+  const risk = calculateRiskSummary(params);
 
-  // Step 1: Get all alerts for the period
-  const allAlerts = getAlertsForPeriod(period, selectedQuarter);
-
-  // Step 2: Filter true positives
-  const truePositives: any[] = [];
-  for (const alert of allAlerts) {
-    const result = validateAlert(alert);
-    if (result.isValid) {
-      truePositives.push(alert);
-    }
-  }
-
-  // Step 3: Total cost impact = sum of costImpact from true positive alerts
-  // This is the actual risk quantified — what these threats would have cost if not detected
-  const totalCostImpact = truePositives.reduce((sum, a) => sum + (a.costImpact || 0), 0);
-
-  // Step 4: Derive savings and ROI
-  const totalInvestment = investmentAmount;
-  const totalCostSavings = totalCostImpact - totalInvestment;
-  const netBenefit = totalCostSavings;
-  const roi = totalInvestment > 0 ? Math.round((netBenefit / totalInvestment) * 100) : 0;
-
-  // Step 5: Breakdown allocation (sums to 100% of savings)
-  const s = Math.max(0, totalCostSavings); // Don't allocate negative savings
-  const breachPrevention = Math.round(s * 0.35);
-  const complianceSavings = Math.round(s * 0.15);
-  const insuranceSavings = Math.round(s * 0.10);
-  const productivityGains = Math.round(s * 0.20);
-  const regulatoryFines = Math.round(s * 0.12);
-  const reputationDamage = Math.round(s * 0.08);
+  const totalInvestment = Math.round(investmentAmount * PERIOD_SHARE[period]);
+  const totalCostImpact = Math.round(risk.lossAvoided.mean);
+  const netBenefit = totalCostImpact - totalInvestment;
 
   return {
-    totalAlerts: allAlerts.length,
-    truePositiveCount: truePositives.length,
-    falsePositiveCount: allAlerts.length - truePositives.length,
-    truePositiveRate: allAlerts.length > 0 ? Math.round((truePositives.length / allAlerts.length) * 1000) / 10 : 0,
+    totalAlerts: risk.totalAlerts,
+    truePositiveCount: risk.countedAlerts,
+    falsePositiveCount: risk.totalAlerts - risk.countedAlerts,
+    truePositiveRate: risk.totalAlerts > 0 ? Math.round((risk.countedAlerts / risk.totalAlerts) * 1000) / 10 : 0,
+    incidentCount: risk.incidentCount,
+    confirmedIncidents: risk.confirmedIncidents,
+    unverifiedIncidents: risk.unverifiedIncidents,
+    dismissedIncidents: risk.dismissedIncidents,
+    confirmedShare: Math.round(risk.confirmedShare * 1000) / 10,
+    grossExposure: Math.round(risk.grossExposure),
     totalCostImpact,
-    totalCostSavings,
-    breachPrevention,
-    complianceSavings,
-    insuranceSavings,
-    productivityGains,
-    regulatoryFines,
-    reputationDamage,
+    lossAvoidedLow: Math.round(risk.lossAvoided.p5),
+    lossAvoidedMedian: Math.round(risk.lossAvoided.p50),
+    lossAvoidedHigh: Math.round(risk.lossAvoided.p95),
+    categoryBreakdown: risk.byCategory.map(r => ({
+      category: r.key,
+      incidents: r.incidents,
+      lossAvoided: Math.round(r.expectedLossAvoided),
+    })),
     totalInvestment,
+    totalCostSavings: netBenefit,
     netBenefit,
-    roi,
+    roi: roiPct(totalCostImpact, totalInvestment),
+    roiLow: roiPct(risk.lossAvoided.p5, totalInvestment),
+    roiHigh: roiPct(risk.lossAvoided.p95, totalInvestment),
   };
 };
 
-// Legacy wrapper — returns just the cost savings number for backward compat
+function currentQuarterLabel(): string {
+  const now = new Date();
+  return `Q${Math.floor(now.getUTCMonth() / 3) + 1} ${now.getUTCFullYear()}`;
+}
+
+// Legacy wrapper — returns just the expected loss avoided
 export const calculateCostSavingsFromEDRAlerts = async (params: CostCalculationParams): Promise<number> => {
   const metrics = await calculateCostMetrics(params);
-  return metrics.totalCostImpact; // Return full impact (what true positives would have cost)
+  return metrics.totalCostImpact;
 };
 
 // ─── EXPORTS ────────────────────────────────────────────────────────────────
 
-export const validateAlertMITRECompliance = async (alert: any) => {
-  const result = validateAlert(alert);
-  const threatActors = searchThreatActors(result.techniques);
+export const validateAlertMITRECompliance = async (alert: SecurityAlert) => {
+  const verdict = verdictFor(alert);
+  const pReal = verdict === "confirmed" ? 1 : verdict === "dismissed" ? 0 : unverifiedProbability(alert, isKnownTechnique);
+  const validatedTechniques = (alert.mitreTechniques || []).filter(
+    t => isKnownTechnique(t) || isKnownTechnique(t.split(".")[0])
+  );
   return {
-    isValid: result.isValid,
-    riskScore: result.riskScore,
-    validatedTechniques: result.techniques,
-    threatActors,
+    isValid: pReal > 0,
+    verdict,
+    riskScore: pReal,
+    validatedTechniques,
+    threatActors: searchThreatActors(validatedTechniques),
     webIntelligence: [] as string[],
   };
 };
@@ -483,7 +457,9 @@ export const THREAT_ACTORS = THREAT_ACTOR_DATABASE;
 export const searchKnownThreatActors = searchThreatActors;
 
 export const formatCurrency = (amount: number): string => {
-  if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
-  if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`;
-  return `$${amount.toLocaleString()}`;
+  const sign = amount < 0 ? "-" : "";
+  const abs = Math.abs(amount);
+  if (abs >= 1000000) return `${sign}$${(abs / 1000000).toFixed(1)}M`;
+  if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(0)}K`;
+  return `${sign}$${abs.toLocaleString()}`;
 };

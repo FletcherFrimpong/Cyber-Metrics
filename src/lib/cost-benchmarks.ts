@@ -6,12 +6,11 @@
 //   - Verizon DBIR 2024: incident frequency and impact by type
 //   - SANS Institute: incident response cost benchmarks
 //
-// These represent the POTENTIAL LOSS PREVENTED per incident — not the cost of a full breach.
-// A single detected-and-resolved incident prevents escalation to a breach.
-// The values are conservative estimates based on:
-//   - Average cost if the incident had escalated undetected
-//   - Weighted by probability of escalation at each severity level
-//   - Adjusted for industry median (Technology sector baseline)
+// These are the loss IF the incident had escalated to its damaging outcome —
+// a share of full breach cost for that category and severity (Technology sector
+// baseline). They are NOT discounted for the chance of escalation: the risk
+// model (./risk-model.ts) applies that probability per incident, by kill-chain
+// stage. Do not sum these directly as "loss avoided".
 
 import type { AlertCategory } from "./sentinel-category-mapper";
 

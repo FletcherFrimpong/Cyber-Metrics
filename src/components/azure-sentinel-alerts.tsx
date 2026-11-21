@@ -105,15 +105,15 @@ export default function AzureSentinelAlerts({
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "Critical":
-        return "bg-red-500/10 border-red-500/30 text-red-400";
+        return "bg-red-50 border-red-200 text-red-600";
       case "High":
-        return "bg-orange-500/10 border-orange-500/30 text-orange-400";
+        return "bg-orange-50 border-orange-200 text-neutral-900";
       case "Medium":
-        return "bg-yellow-500/10 border-yellow-500/30 text-yellow-400";
+        return "bg-yellow-50 border-yellow-200 text-yellow-600";
       case "Low":
-        return "bg-green-500/10 border-green-500/30 text-green-400";
+        return "bg-green-50 border-green-200 text-green-600";
       default:
-        return "bg-neutral-500/10 border-neutral-500/30 text-neutral-400";
+        return "bg-neutral-500/10 border-neutral-500/30 text-neutral-500";
     }
   };
 
@@ -142,16 +142,16 @@ export default function AzureSentinelAlerts({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-bold text-white">CrowdStrike Alerts</h3>
-<p className="text-sm text-neutral-400">
+          <h3 className="text-lg font-bold text-neutral-900">CrowdStrike Alerts</h3>
+<p className="text-sm text-neutral-500">
   Real security alerts from CrowdStrike with detailed threat intelligence
 </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="bg-blue-500/10 border-blue-500/30 text-blue-400">
+          <Badge variant="outline" className="bg-blue-50 border-blue-200 text-blue-600">
             {filteredAlerts.length} Alerts
           </Badge>
-          <Badge variant="outline" className="bg-green-500/10 border-green-500/30 text-green-400">
+          <Badge variant="outline" className="bg-green-50 border-green-200 text-green-600">
             Live Data
           </Badge>
         </div>
@@ -160,7 +160,7 @@ export default function AzureSentinelAlerts({
       {/* Alerts List */}
       <div className="space-y-3">
         {filteredAlerts.map((alert) => (
-          <Card key={alert.id} className="bg-neutral-900 border-neutral-700 hover:border-neutral-600 transition-colors">
+          <Card key={alert.id} className="bg-white border-neutral-200 hover:border-neutral-300 transition-colors">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-3 flex-1">
@@ -172,7 +172,7 @@ export default function AzureSentinelAlerts({
                   {/* Alert Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
-                      <h4 className="text-sm font-semibold text-white truncate">
+                      <h4 className="text-sm font-semibold text-neutral-900 truncate">
                         {alert.title}
                       </h4>
                       <Badge variant="outline" className={`text-xs ${getSeverityColor(alert.severity)}`}>
@@ -180,7 +180,7 @@ export default function AzureSentinelAlerts({
                       </Badge>
                     </div>
 
-                    <p className="text-xs text-neutral-400 mb-2 line-clamp-2">
+                    <p className="text-xs text-neutral-500 mb-2 line-clamp-2">
                       {alert.description}
                     </p>
 
@@ -205,7 +205,7 @@ export default function AzureSentinelAlerts({
                       <span className="text-xs text-neutral-500">MITRE:</span>
                       <div className="flex gap-1">
                         {alert.mitreTactics.slice(0, 2).map((tactic, index) => (
-                          <Badge key={index} variant="outline" className="text-xs bg-purple-500/10 border-purple-500/30 text-purple-400">
+                          <Badge key={index} variant="outline" className="text-xs bg-purple-50 border-purple-200 text-purple-600">
                             {tactic}
                           </Badge>
                         ))}
@@ -219,14 +219,14 @@ export default function AzureSentinelAlerts({
                       variant="ghost"
                       size="sm"
                       onClick={() => setExpandedAlert(expandedAlert === alert.id ? null : alert.id)}
-                      className="text-neutral-400 hover:text-white"
+                      className="text-neutral-500 hover:text-neutral-900"
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-neutral-400 hover:text-white"
+                      className="text-neutral-500 hover:text-neutral-900"
                     >
                       <Download className="w-4 h-4" />
                     </Button>
@@ -236,33 +236,33 @@ export default function AzureSentinelAlerts({
 
               {/* Expanded Alert Details */}
               {expandedAlert === alert.id && (
-                <div className="mt-4 pt-4 border-t border-neutral-700">
+                <div className="mt-4 pt-4 border-t border-neutral-200">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Technical Details */}
                     <div>
-                      <h5 className="text-sm font-semibold text-white mb-2">Technical Details</h5>
+                      <h5 className="text-sm font-semibold text-neutral-900 mb-2">Technical Details</h5>
                       <div className="space-y-2 text-xs">
                         <div className="flex justify-between">
-                          <span className="text-neutral-400">Platform:</span>
-                          <span className="text-white">{alert.platform}</span>
+                          <span className="text-neutral-500">Platform:</span>
+                          <span className="text-neutral-900">{alert.platform}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-neutral-400">Category:</span>
-                          <span className="text-white">{alert.category}</span>
+                          <span className="text-neutral-500">Category:</span>
+                          <span className="text-neutral-900">{alert.category}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-neutral-400">Source:</span>
-                          <span className="text-white">{alert.source}</span>
+                          <span className="text-neutral-500">Source:</span>
+                          <span className="text-neutral-900">{alert.source}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Affected Entities */}
                     <div>
-                      <h5 className="text-sm font-semibold text-white mb-2">Affected Entities</h5>
+                      <h5 className="text-sm font-semibold text-neutral-900 mb-2">Affected Entities</h5>
                       <div className="flex flex-wrap gap-1">
                         {alert.affectedEntities.map((entity, index) => (
-                          <Badge key={index} variant="outline" className="text-xs bg-blue-500/10 border-blue-500/30 text-blue-400">
+                          <Badge key={index} variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-600">
                             {entity}
                           </Badge>
                         ))}
@@ -271,10 +271,10 @@ export default function AzureSentinelAlerts({
 
                     {/* IOC Indicators */}
                     <div>
-                      <h5 className="text-sm font-semibold text-white mb-2">IOC Indicators</h5>
+                      <h5 className="text-sm font-semibold text-neutral-900 mb-2">IOC Indicators</h5>
                       <div className="space-y-1">
                         {alert.iocIndicators.map((ioc, index) => (
-                          <div key={index} className="text-xs font-mono text-red-400 bg-red-500/10 p-1 rounded">
+                          <div key={index} className="text-xs tabular-nums text-red-600 bg-red-50 p-1 rounded">
                             {ioc}
                           </div>
                         ))}
@@ -283,11 +283,11 @@ export default function AzureSentinelAlerts({
 
                     {/* Remediation Steps */}
                     <div>
-                      <h5 className="text-sm font-semibold text-white mb-2">Remediation Steps</h5>
+                      <h5 className="text-sm font-semibold text-neutral-900 mb-2">Remediation Steps</h5>
                       <div className="space-y-1">
                         {alert.remediationSteps.map((step, index) => (
-                          <div key={index} className="text-xs text-neutral-300 flex items-start gap-2">
-                            <span className="text-green-400 mt-0.5">•</span>
+                          <div key={index} className="text-xs text-neutral-700 flex items-start gap-2">
+                            <span className="text-green-600 mt-0.5">•</span>
                             {step}
                           </div>
                         ))}
@@ -297,8 +297,8 @@ export default function AzureSentinelAlerts({
 
                   {/* Raw Log Preview */}
                   <div className="mt-4">
-                    <h5 className="text-sm font-semibold text-white mb-2">Raw Log Preview</h5>
-                    <div className="bg-neutral-800 p-3 rounded text-xs font-mono text-neutral-300 overflow-x-auto">
+                    <h5 className="text-sm font-semibold text-neutral-900 mb-2">Raw Log Preview</h5>
+                    <div className="bg-neutral-50 p-3 rounded text-xs tabular-nums text-neutral-700 overflow-x-auto">
                       <pre>{JSON.stringify(alert.rawLog, null, 2)}</pre>
                     </div>
                   </div>
@@ -310,28 +310,28 @@ export default function AzureSentinelAlerts({
       </div>
 
       {/* Summary Stats */}
-      <Card className="bg-neutral-900 border-neutral-700">
+      <Card className="bg-white border-neutral-200">
         <CardContent className="p-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             <div>
-              <p className="text-xs text-neutral-400">Total Alerts</p>
-              <p className="text-lg font-bold text-white">{filteredAlerts.length}</p>
+              <p className="text-xs text-neutral-500">Total Alerts</p>
+              <p className="text-lg font-bold text-neutral-900">{filteredAlerts.length}</p>
             </div>
             <div>
-              <p className="text-xs text-neutral-400">Critical</p>
-              <p className="text-lg font-bold text-red-400">
+              <p className="text-xs text-neutral-500">Critical</p>
+              <p className="text-lg font-bold text-red-600">
                 {filteredAlerts.filter(a => a.severity === "Critical").length}
               </p>
             </div>
             <div>
-              <p className="text-xs text-neutral-400">High</p>
-              <p className="text-lg font-bold text-orange-400">
+              <p className="text-xs text-neutral-500">High</p>
+              <p className="text-lg font-bold text-neutral-900">
                 {filteredAlerts.filter(a => a.severity === "High").length}
               </p>
             </div>
             <div>
-              <p className="text-xs text-neutral-400">Total Impact</p>
-              <p className="text-lg font-bold text-green-400">
+              <p className="text-xs text-neutral-500">Total Impact</p>
+              <p className="text-lg font-bold text-green-600">
                 {formatCost(filteredAlerts.reduce((sum, alert) => sum + alert.costImpact, 0))}
               </p>
             </div>

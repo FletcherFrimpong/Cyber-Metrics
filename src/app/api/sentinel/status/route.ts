@@ -4,8 +4,10 @@
 
 import { NextResponse } from "next/server";
 import { requireAuth, isAuthError } from "@/lib/auth/api-guard";
+import { startSavedConnectors } from "@/lib/connectors/runtime";
 
 export async function GET() {
+  startSavedConnectors();
   const auth = await requireAuth("settings:view");
   if (isAuthError(auth)) return auth;
   // Check if Sentinel creds exist in the settings store (globalThis)

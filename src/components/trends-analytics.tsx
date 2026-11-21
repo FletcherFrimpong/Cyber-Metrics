@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Shield, AlertTriangle, Activity, DollarSign, Calendar, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import edrDataService from "@/lib/edr-data-service";
-import { calculateCostMetrics } from "@/lib/cost-calculations";
+import { Shield, AlertTriangle, Activity, DollarSign, Calendar, TrendingUp } from "lucide-react";
+import { Panel, Tag, th, td } from "@/components/ui/panel";
+import { useDashboardData, type DashboardMetrics } from "@/hooks/useDashboardData";
 import type { TrendsAnalyticsData } from "@/lib/pdf-export";
 
 interface TrendsAnalyticsProps {
@@ -37,96 +36,43 @@ function fmt(n: number): string {
   return `$${n.toLocaleString()}`;
 }
 
+const EMPTY_METRICS: DashboardMetrics = {
+  totalAlerts: 0, truePositiveCount: 0, falsePositiveCount: 0, truePositiveRate: 0,
+  incidentCount: 0, confirmedIncidents: 0, unverifiedIncidents: 0, dismissedIncidents: 0,
+  confirmedShare: 0, grossExposure: 0, totalCostImpact: 0, lossAvoidedLow: 0, lossAvoidedMedian: 0,
+  lossAvoidedHigh: 0, categoryBreakdown: [], totalInvestment: 0, totalCostSavings: 0, netBenefit: 0,
+  roi: 0, roiLow: 0, roiHigh: 0,
+};
+
 export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAnalyticsProps) {
-  const [costMetrics, setCostMetrics] = useState({
-    roi: 0, totalCostSavings: 0, totalCostImpact: 0, totalInvestment: 0, netBenefit: 0,
-    truePositiveCount: 0, truePositiveRate: 0,
-  });
+  const { data, loading, error } = useDashboardData(timeView, selectedQuarter);
   const [isExporting, setIsExporting] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        // Fetch investment amount from settings
-        const settingsRes = await fetch("/api/settings").catch(() => null);
-        const settings = settingsRes ? await settingsRes.json() : {};
-        const investment = settings.investmentAmount || 0;
+  const costMetrics = data?.costMetrics ?? EMPTY_METRICS;
+  const totalAlerts = data?.totalAlerts ?? 0;
+  // Risk-adjusted loss avoided from the model, not a raw sum of benchmarks
+  const totalCostImpact = costMetrics.totalCostImpact;
+  const severityCounts: Record<SeverityLevel, number> = data?.severityCounts ?? { Critical: 0, High: 0, Medium: 0, Low: 0 };
+  const categoryCounts = useMemo(
+    () =>
+      (Object.keys(CATEGORY_LABELS) as CategoryKey[]).map((k) => {
+        const c = data?.categories.find((x) => x.key === k);
+        return { key: k, label: CATEGORY_LABELS[k], count: c?.count ?? 0, cost: c?.lossAvoided ?? 0, critical: c?.critical ?? 0, high: c?.high ?? 0 };
+      }),
+    [data]
+  );
+  const trendData = data?.trend ?? [];
 
-        const m = await calculateCostMetrics({
-          period: timeView === "yearly" ? "yearly" : "quarterly",
-          selectedQuarter,
-          investmentAmount: investment,
-        });
-        setCostMetrics({
-          roi: m.roi, totalCostSavings: m.totalCostSavings, totalCostImpact: m.totalCostImpact,
-          totalInvestment: m.totalInvestment, netBenefit: m.netBenefit,
-          truePositiveCount: m.truePositiveCount, truePositiveRate: m.truePositiveRate,
-        });
-      } catch {
-        setCostMetrics({ roi: 0, totalCostSavings: 0, totalCostImpact: 0, totalInvestment: 0, netBenefit: 0, truePositiveCount: 0, truePositiveRate: 0 });
-      }
-    };
-    load();
-  }, [timeView, selectedQuarter]);
-
-  // Aggregate alerts
+  // Per-category severity rows for the PDF, rebuilt from the server's counts
   const timeframeAlerts = useMemo(() => {
-    if (timeView === "quarterly") return edrDataService.getTimeframeAlerts(selectedQuarter);
-    const year = selectedQuarter.split(" ")[1];
-    const agg = { edr: [] as any[], email: [] as any[], network: [] as any[], web: [] as any[], cloud: [] as any[] };
-    for (let q = 1; q <= 4; q++) {
-      const qa = edrDataService.getTimeframeAlerts(`Q${q} ${year}`);
-      (Object.keys(agg) as CategoryKey[]).forEach(k => agg[k].push(...qa[k]));
-    }
-    return agg;
-  }, [timeView, selectedQuarter]);
-
-  // Derived stats
-  const allAlerts = useMemo(() => {
-    return (Object.keys(timeframeAlerts) as CategoryKey[]).flatMap(k => timeframeAlerts[k]);
-  }, [timeframeAlerts]);
-
-  const totalAlerts = allAlerts.length;
-  const totalCostImpact = allAlerts.reduce((s, a: any) => s + (a.costImpact || 0), 0);
-  const severityCounts = useMemo(() => {
-    const counts: Record<SeverityLevel, number> = { Critical: 0, High: 0, Medium: 0, Low: 0 };
-    allAlerts.forEach((a: any) => { if (counts[a.severity as SeverityLevel] !== undefined) counts[a.severity as SeverityLevel]++; });
-    return counts;
-  }, [allAlerts]);
-  const categoryCounts = useMemo(() => {
-    return (Object.keys(timeframeAlerts) as CategoryKey[]).map(k => ({
-      key: k,
-      label: CATEGORY_LABELS[k],
-      count: timeframeAlerts[k].length,
-      cost: timeframeAlerts[k].reduce((s: number, a: any) => s + (a.costImpact || 0), 0),
-      critical: timeframeAlerts[k].filter((a: any) => a.severity === "Critical").length,
-      high: timeframeAlerts[k].filter((a: any) => a.severity === "High").length,
-    }));
-  }, [timeframeAlerts]);
-
-  // Quarterly trend data
-  const trendData = useMemo(() => {
-    const currentDate = new Date();
-    const currentQuarter = Math.floor(currentDate.getMonth() / 3) + 1;
-    const currentYear = currentDate.getFullYear();
-    const quarters = [];
-    for (let i = 3; i >= 0; i--) {
-      let tq = currentQuarter - i;
-      let ty = currentYear;
-      if (tq <= 0) { tq += 4; ty -= 1; }
-      if (ty >= 2024) {
-        const key = `Q${tq} ${ty}`;
-        const qa = edrDataService.getTimeframeAlerts(key);
-        const all = (Object.keys(qa) as CategoryKey[]).flatMap(k => qa[k]);
-        quarters.push({
-          quarter: key,
-          alerts: all.length,
-          cost: all.reduce((s: number, a: any) => s + (a.costImpact || 0), 0),
-        });
+    const out = { edr: [] as any[], email: [] as any[], network: [] as any[], web: [] as any[], cloud: [] as any[] };
+    for (const c of data?.categories ?? []) {
+      for (const [sev, n] of [["Critical", c.critical], ["High", c.high], ["Medium", c.medium], ["Low", c.low]] as const) {
+        for (let i = 0; i < n; i++) out[c.key].push({ severity: sev });
       }
     }
-    return quarters;
-  }, []);
+    return out;
+  }, [data]);
 
   // KRI metrics derived from data
   const kriMetrics = useMemo(() => {
@@ -151,6 +97,7 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
         selectedQuarter,
         timeframeAlerts,
         roiValue: costMetrics.roi,
+        metrics: costMetrics,
         quarterlyData: trendData.map(t => ({ quarter: t.quarter, attacks: t.alerts, costSaved: t.cost, categories: {} })),
         yearlyData: [],
         kriMetrics: {
@@ -170,235 +117,211 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
     }
   };
 
-  const maxCategoryCount = Math.max(...categoryCounts.map(c => c.count), 1);
-  const maxTrendAlerts = Math.max(...trendData.map(t => t.alerts), 1);
+
+  const periodLabel = timeView === "quarterly" ? selectedQuarter : selectedQuarter.split(" ")[1];
+  const maxTrendCost = Math.max(...trendData.map(t => t.cost), 1);
+  const tone = (value: string) =>
+    value === "High" || value === "Elevated" || value === "Needs Review"
+      ? "red"
+      : value === "Medium" || value === "Moderate" || value === "Adequate"
+      ? "yellow"
+      : "green";
+  const signed = (n: number) => (n < 0 ? `-${fmt(-n)}` : fmt(n));
+
+  const stats = [
+    {
+      label: "Expected loss avoided",
+      value: fmt(costMetrics.totalCostImpact),
+      note: `Range ${fmt(costMetrics.lossAvoidedLow)} – ${fmt(costMetrics.lossAvoidedHigh)}`,
+      lead: true,
+    },
+    {
+      label: "Net benefit",
+      value: signed(costMetrics.netBenefit),
+      note: `After ${fmt(costMetrics.totalInvestment)} investment for the period`,
+      negative: costMetrics.netBenefit < 0,
+    },
+    {
+      label: "ROI",
+      value: `${costMetrics.roi > 0 ? "+" : ""}${costMetrics.roi.toLocaleString()}%`,
+      note: `Range ${costMetrics.roiLow.toLocaleString()}% to ${costMetrics.roiHigh.toLocaleString()}%`,
+      negative: costMetrics.roi < 0,
+    },
+    {
+      label: "True positives",
+      value: costMetrics.truePositiveCount.toLocaleString(),
+      note: `${costMetrics.truePositiveRate}% of all alerts`,
+    },
+    {
+      label: "Total alerts",
+      value: totalAlerts.toLocaleString(),
+      note: `Across ${categoryCounts.filter(c => c.count > 0).length} categories`,
+    },
+  ];
 
   return (
-    <div className="space-y-5 pb-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-white">
-            Trends & Analytics
-            <span className="ml-3 text-sm font-normal text-neutral-500">
-              {timeView === "quarterly" ? selectedQuarter : selectedQuarter.split(" ")[1]}
-            </span>
-          </h2>
+    <div className="space-y-3 pb-6">
+      {/* Headline figures: the money leads, counts follow */}
+      <div className="rounded-lg border border-neutral-200 bg-white overflow-hidden">
+        <div className="flex items-center gap-2 h-10 px-3 border-b border-neutral-200">
+          <DollarSign className="w-3.5 h-3.5 text-neutral-500" />
+          <h2 className="text-[13px] font-medium text-neutral-900">Trends &amp; analytics</h2>
+          <span className="text-[13px] text-neutral-400">· {periodLabel}</span>
+          {data?.usingSampleData && <Tag tone="yellow">Demo data</Tag>}
+          {loading && <span className="text-[12px] text-neutral-400">Loading…</span>}
+          {error && <span className="text-[12px] text-red-600">{error}</span>}
+          <Button variant="outline" size="sm" onClick={handleExportReport} disabled={isExporting} className="ml-auto h-7 text-xs shadow-none">
+            <Calendar className="w-3.5 h-3.5" />
+            {isExporting ? "Exporting..." : "Export PDF"}
+          </Button>
         </div>
-        <Button variant="outline" size="sm" onClick={handleExportReport} disabled={isExporting} className="text-xs">
-          <Calendar className="w-3.5 h-3.5 mr-1.5" />
-          {isExporting ? "Exporting..." : "Export PDF"}
-        </Button>
-      </div>
-
-      {/* Top KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
-          <div className="text-xs text-neutral-500 uppercase tracking-wide mb-1">Total Alerts</div>
-          <div className="text-2xl font-bold text-white tabular-nums">{totalAlerts.toLocaleString()}</div>
-          <div className="text-xs text-neutral-500 mt-1">across {categoryCounts.filter(c => c.count > 0).length} categories</div>
-        </div>
-        <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
-          <div className="text-xs text-neutral-500 uppercase tracking-wide mb-1">True Positives</div>
-          <div className="text-2xl font-bold text-orange-400 tabular-nums">{costMetrics.truePositiveCount.toLocaleString()}</div>
-          <div className="text-xs text-neutral-500 mt-1">{costMetrics.truePositiveRate}% of all alerts — {fmt(costMetrics.totalCostImpact)} risk quantified</div>
-        </div>
-        <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
-          <div className="text-xs text-neutral-500 uppercase tracking-wide mb-1">Net Benefit</div>
-          <div className={`text-2xl font-bold tabular-nums ${costMetrics.netBenefit >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {fmt(costMetrics.netBenefit)}
-          </div>
-          <div className="text-xs text-neutral-500 mt-1">savings minus {fmt(costMetrics.totalInvestment)} investment</div>
-        </div>
-        <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4">
-          <div className="text-xs text-neutral-500 uppercase tracking-wide mb-1">ROI</div>
-          <div className={`text-2xl font-bold tabular-nums ${costMetrics.roi >= 0 ? "text-green-400" : "text-red-400"}`}>
-            {costMetrics.roi > 0 ? "+" : ""}{costMetrics.roi.toLocaleString()}%
-          </div>
-          <div className="text-xs text-neutral-500 mt-1">return on investment</div>
-        </div>
-      </div>
-
-      {/* Main Grid: Categories + Severity */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Alert Categories Table */}
-        <Card className="lg:col-span-2 bg-neutral-900 border-neutral-800">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-medium text-neutral-300 uppercase tracking-wide">Alert Categories</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <div className="space-y-1">
-              {/* Header row */}
-              <div className="grid grid-cols-12 text-[10px] text-neutral-600 uppercase tracking-wider pb-1 border-b border-neutral-800">
-                <div className="col-span-3">Category</div>
-                <div className="col-span-4">Volume</div>
-                <div className="col-span-2 text-right">Critical</div>
-                <div className="col-span-3 text-right">Cost Impact</div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-px bg-neutral-200">
+          {stats.map(stat => (
+            <div key={stat.label} className="px-3 py-3 min-w-0 bg-white">
+              <div className="text-[12px] text-neutral-500">{stat.label}</div>
+              <div className={`mt-1 font-semibold tabular-nums ${stat.lead ? "text-2xl" : "text-lg"} ${stat.negative ? "text-red-600" : "text-neutral-900"}`}>
+                {stat.value}
               </div>
-              {categoryCounts.map(cat => (
-                <div key={cat.key} className="grid grid-cols-12 items-center py-2 text-sm border-b border-neutral-800/50 last:border-0">
-                  <div className="col-span-3 text-neutral-300 text-xs font-medium">{cat.label}</div>
-                  <div className="col-span-4 flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-blue-500 rounded-full transition-all"
-                        style={{ width: `${(cat.count / maxCategoryCount) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-neutral-400 tabular-nums w-10 text-right">{cat.count}</span>
-                  </div>
-                  <div className="col-span-2 text-right">
-                    {cat.critical > 0 ? (
-                      <span className="text-xs text-red-400 tabular-nums">{cat.critical}</span>
-                    ) : (
-                      <span className="text-xs text-neutral-700">0</span>
+              <div className="mt-0.5 text-[12px] text-neutral-400 truncate">{stat.note}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Loss avoided by quarter + categories */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Panel icon={TrendingUp} title="Quarterly trend" subtitle="Expected loss avoided and alert volume by quarter">
+          <div className="flex items-end gap-4 h-52 px-4 pt-4">
+            {trendData.map((q, i) => {
+              const prev = i > 0 ? trendData[i - 1] : null;
+              const change = prev && prev.alerts > 0 ? ((q.alerts - prev.alerts) / prev.alerts) * 100 : 0;
+              const isSelected = q.quarter === selectedQuarter;
+              return (
+                <div key={q.quarter} className="flex-1 h-full flex flex-col items-center justify-end min-w-0">
+                  <div className="text-[12px] text-neutral-700 tabular-nums mb-1">{fmt(q.cost)}</div>
+                  <div
+                    className={`w-full max-w-16 rounded-t ${isSelected ? "bg-neutral-900" : "bg-neutral-200"}`}
+                    style={{ height: `${Math.max(2, (q.cost / maxTrendCost) * 100)}%` }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-4 px-4 py-2 border-t border-neutral-200">
+            {trendData.map((q, i) => {
+              const prev = i > 0 ? trendData[i - 1] : null;
+              const change = prev && prev.alerts > 0 ? ((q.alerts - prev.alerts) / prev.alerts) * 100 : 0;
+              const isSelected = q.quarter === selectedQuarter;
+              return (
+                <div key={q.quarter} className="flex-1 text-center min-w-0">
+                  <div className={`text-[12px] ${isSelected ? "font-medium text-neutral-900" : "text-neutral-500"}`}>{q.quarter}</div>
+                  <div className="text-[11px] text-neutral-400 tabular-nums">
+                    {q.alerts} alerts
+                    {i > 0 && change !== 0 && (
+                      <span className={change > 0 ? "text-red-600" : "text-green-600"}> {change > 0 ? "+" : ""}{change.toFixed(0)}%</span>
                     )}
                   </div>
-                  <div className="col-span-3 text-right text-xs text-neutral-300 tabular-nums">{fmt(cat.cost)}</div>
                 </div>
+              );
+            })}
+          </div>
+        </Panel>
+
+        <Panel icon={Shield} title="Alert categories" subtitle="Volume and loss avoided by security tool type">
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className={`${th} w-8`}>#</th>
+                <th className={th}>Category</th>
+                <th className={`${th} text-right`}>Alerts</th>
+                <th className={`${th} text-right`}>Critical</th>
+                <th className={`${th} text-right`}>Loss avoided</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...categoryCounts].sort((a, b) => b.cost - a.cost || b.count - a.count).map((cat, i) => (
+                <tr key={cat.key}>
+                  <td className={`${td} text-neutral-400 tabular-nums`}>{i + 1}</td>
+                  <td className={`${td} font-medium`}>{cat.label}</td>
+                  <td className={`${td} text-right tabular-nums`}>{cat.count}</td>
+                  <td className={`${td} text-right tabular-nums ${cat.critical > 0 ? "text-red-600" : "text-neutral-300"}`}>{cat.critical}</td>
+                  <td className={`${td} text-right tabular-nums`}>{cat.count > 0 ? fmt(cat.cost) : "—"}</td>
+                </tr>
               ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Severity Breakdown */}
-        <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-medium text-neutral-300 uppercase tracking-wide">Severity Distribution</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <div className="space-y-3">
-              {(["Critical", "High", "Medium", "Low"] as SeverityLevel[]).map(sev => {
-                const count = severityCounts[sev];
-                const pct = totalAlerts > 0 ? (count / totalAlerts * 100) : 0;
-                const cfg = SEVERITY_CONFIG[sev];
-                return (
-                  <div key={sev}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-xs font-medium ${cfg.color}`}>{sev}</span>
-                      <span className="text-xs text-neutral-500 tabular-nums">{count} ({pct.toFixed(1)}%)</span>
-                    </div>
-                    <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-                      <div className={`h-full ${cfg.bar} rounded-full transition-all`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Quick stats */}
-            <div className="mt-5 pt-4 border-t border-neutral-800 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-neutral-500">Avg Cost / Alert</span>
-                <span className="text-neutral-300 tabular-nums">{totalAlerts > 0 ? fmt(Math.round(totalCostImpact / totalAlerts)) : "$0"}</span>
-              </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-neutral-500">High+ Rate</span>
-                <span className="text-neutral-300 tabular-nums">
-                  {totalAlerts > 0 ? ((severityCounts.Critical + severityCounts.High) / totalAlerts * 100).toFixed(1) : "0"}%
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </tbody>
+          </table>
+        </Panel>
       </div>
 
-      {/* Quarterly Trend + KRI Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Quarterly Trend */}
-        <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-medium text-neutral-300 uppercase tracking-wide">Quarterly Trend</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <div className="space-y-3">
-              {trendData.map((q, i) => {
-                const prev = i > 0 ? trendData[i - 1] : null;
-                const change = prev ? ((q.alerts - prev.alerts) / prev.alerts * 100) : 0;
-                const isSelected = q.quarter === selectedQuarter;
-                return (
-                  <div key={q.quarter} className={`flex items-center gap-3 p-2.5 rounded-md ${isSelected ? "bg-neutral-800 border border-neutral-700" : ""}`}>
-                    <div className="w-16 text-xs font-mono text-neutral-400">{q.quarter}</div>
-                    <div className="flex-1">
-                      <div className="h-2 bg-neutral-800 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${isSelected ? "bg-orange-500" : "bg-neutral-600"}`}
-                          style={{ width: `${(q.alerts / maxTrendAlerts) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="w-14 text-right text-xs text-neutral-300 tabular-nums">{q.alerts}</div>
-                    <div className="w-16 text-right">
-                      {i === 0 ? (
-                        <Minus className="w-3 h-3 text-neutral-600 ml-auto" />
-                      ) : change > 0 ? (
-                        <span className="text-xs text-red-400 tabular-nums">+{change.toFixed(0)}%</span>
-                      ) : change < 0 ? (
-                        <span className="text-xs text-green-400 tabular-nums">{change.toFixed(0)}%</span>
-                      ) : (
-                        <span className="text-xs text-neutral-600">0%</span>
-                      )}
+      {/* Severity + key risk indicators */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <Panel icon={AlertTriangle} title="Severity distribution" subtitle="Share of alerts at each severity">
+          <div className="p-3 space-y-1.5">
+            {(["Critical", "High", "Medium", "Low"] as SeverityLevel[]).map(sev => {
+              const count = severityCounts[sev];
+              const pct = totalAlerts > 0 ? (count / totalAlerts) * 100 : 0;
+              return (
+                <div key={sev} className="flex items-center gap-3">
+                  <div className="relative flex-1 h-8 rounded-md overflow-hidden">
+                    <div className="absolute inset-y-0 left-0 rounded-md bg-neutral-100" style={{ width: `${Math.max(pct, 1)}%` }} />
+                    <div className="relative h-full flex items-center gap-2 px-2.5 text-[13px] text-neutral-800 whitespace-nowrap">
+                      <span className={`w-1.5 h-1.5 rounded-full ${SEVERITY_CONFIG[sev].bar}`} />
+                      {sev}
+                      <span className="text-neutral-400 tabular-nums">{count}</span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-            <div className="mt-3 pt-3 border-t border-neutral-800 flex justify-between text-[10px] text-neutral-600 uppercase tracking-wider">
-              <span>Quarter</span>
-              <span>Alerts vs. Prior</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Key Risk Indicators */}
-        <Card className="bg-neutral-900 border-neutral-800">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-medium text-neutral-300 uppercase tracking-wide">Key Risk Indicators</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 pb-4">
-            <div className="grid grid-cols-2 gap-3">
-              {kriMetrics.map(kri => (
-                <div key={kri.label} className="bg-neutral-800/50 border border-neutral-800 rounded-md p-3">
-                  <div className="text-[10px] text-neutral-500 uppercase tracking-wider mb-1.5">{kri.label}</div>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-lg font-bold tabular-nums ${kri.good ? "text-white" : "text-red-400"}`}>
-                      {typeof kri.value === "number" && kri.unit === "%" ? kri.value.toFixed(1) : kri.value}
-                    </span>
-                    <span className="text-xs text-neutral-600">{kri.unit}</span>
-                  </div>
+                  <span className="w-12 text-right text-[13px] text-neutral-600 tabular-nums">{pct.toFixed(1)}%</span>
                 </div>
-              ))}
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-neutral-200 border-t border-neutral-200">
+            <div className="px-3 py-2">
+              <div className="text-[12px] text-neutral-500">Avg loss avoided / alert</div>
+              <div className="text-[13px] font-medium text-neutral-900 tabular-nums">{totalAlerts > 0 ? fmt(Math.round(totalCostImpact / totalAlerts)) : "$0"}</div>
             </div>
+            <div className="px-3 py-2">
+              <div className="text-[12px] text-neutral-500">High+ rate</div>
+              <div className="text-[13px] font-medium text-neutral-900 tabular-nums">
+                {totalAlerts > 0 ? (((severityCounts.Critical + severityCounts.High) / totalAlerts) * 100).toFixed(1) : "0"}%
+              </div>
+            </div>
+          </div>
+        </Panel>
 
-            {/* Risk summary */}
-            <div className="mt-4 p-3 bg-neutral-800/30 border border-neutral-800 rounded-md">
-              <div className="flex items-center gap-2 mb-2">
-                <Shield className="w-3.5 h-3.5 text-neutral-500" />
-                <span className="text-xs text-neutral-400 font-medium">Risk Assessment</span>
-              </div>
-              <div className="space-y-1.5">
-                {[
-                  { label: "Threat Level", value: severityCounts.Critical > 10 ? "High" : severityCounts.Critical > 3 ? "Medium" : "Low" },
-                  { label: "Risk Exposure", value: totalAlerts > 500 ? "Elevated" : totalAlerts > 200 ? "Moderate" : "Controlled" },
-                  { label: "Posture", value: costMetrics.roi > 100 ? "Strong" : costMetrics.roi > 0 ? "Adequate" : "Needs Review" },
-                ].map(item => (
-                  <div key={item.label} className="flex items-center justify-between">
-                    <span className="text-xs text-neutral-500">{item.label}</span>
-                    <span className={`text-xs font-medium ${
-                      item.value === "High" || item.value === "Elevated" || item.value === "Needs Review"
-                        ? "text-red-400"
-                        : item.value === "Medium" || item.value === "Moderate" || item.value === "Adequate"
-                        ? "text-yellow-400"
-                        : "text-green-400"
-                    }`}>
-                      {item.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <Panel icon={Activity} title="Key risk indicators" subtitle="Derived from this period's alerts">
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className={th}>Indicator</th>
+                <th className={`${th} text-right`}>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {kriMetrics.map(kri => (
+                <tr key={kri.label}>
+                  <td className={td}>{kri.label}</td>
+                  <td className={`${td} text-right tabular-nums font-medium ${kri.good ? "" : "text-red-600"}`}>
+                    {typeof kri.value === "number" && kri.unit === "%" ? kri.value.toFixed(1) : kri.value}
+                    <span className="font-normal text-neutral-400">{kri.unit}</span>
+                  </td>
+                </tr>
+              ))}
+              {[
+                { label: "Threat Level", value: severityCounts.Critical > 10 ? "High" : severityCounts.Critical > 3 ? "Medium" : "Low" },
+                { label: "Risk Exposure", value: totalAlerts > 500 ? "Elevated" : totalAlerts > 200 ? "Moderate" : "Controlled" },
+                { label: "Posture", value: costMetrics.roi > 100 ? "Strong" : costMetrics.roi > 0 ? "Adequate" : "Needs Review" },
+              ].map(item => (
+                <tr key={item.label}>
+                  <td className={td}>{item.label}</td>
+                  <td className={`${td} text-right`}>
+                    <Tag tone={tone(item.value)}>{item.value}</Tag>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
       </div>
     </div>
   );

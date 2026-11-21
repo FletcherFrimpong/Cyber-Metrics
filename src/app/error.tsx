@@ -16,22 +16,22 @@ export default function Error({
   }, [error])
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
+    <div className="min-h-screen bg-white flex items-center justify-center">
       <div className="text-center space-y-6">
         <div className="space-y-2">
           <h1 className="text-4xl font-bold text-red-500">Something went wrong!</h1>
-          <p className="text-neutral-400 max-w-md">
+          <p className="text-neutral-500 max-w-md">
             An unexpected error occurred. Please try again or contact support if the problem persists.
           </p>
           {error.digest && (
-            <p className="text-xs text-neutral-500 font-mono">
+            <p className="text-xs text-neutral-500 tabular-nums">
               Error ID: {error.digest}
             </p>
           )}
         </div>
         
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button onClick={reset} className="bg-orange-600 hover:bg-orange-700">
+          <Button onClick={reset} className="bg-neutral-900 hover:bg-neutral-800">
             <RefreshCw className="w-4 h-4 mr-2" />
             Try Again
           </Button>

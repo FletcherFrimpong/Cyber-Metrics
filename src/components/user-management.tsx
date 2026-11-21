@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Panel, Tag, Field, th, td } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Pencil, Trash2, X, Loader2, CheckCircle } from "lucide-react";
+import { Users, Plus, Pencil, Trash2, X, Loader2, CheckCircle, Shield } from "lucide-react";
 
 interface UserRecord {
   id: string;
@@ -23,8 +22,8 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  admin: "bg-red-500/10 border-red-500/30 text-red-400",
-  viewer: "bg-neutral-500/10 border-neutral-500/30 text-neutral-400",
+  admin: "bg-red-50 border-red-200 text-red-600",
+  viewer: "bg-neutral-500/10 border-neutral-500/30 text-neutral-500",
 };
 
 export default function UserManagement() {
@@ -151,44 +150,37 @@ export default function UserManagement() {
   };
 
   return (
-    <div className="space-y-6 w-full">
-      <div>
-        <h2 className="text-2xl font-semibold text-white">User Management</h2>
-        <p className="text-base text-neutral-500">Invite and manage users, assign roles</p>
-      </div>
+    <div className="space-y-3 w-full max-w-4xl pb-6">
+      <p className="text-[13px] text-neutral-500">Invite and manage users, assign roles</p>
 
-      <Card className="bg-neutral-900 border-neutral-800">
-        <CardHeader className="pb-4 pt-5 px-6">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold text-neutral-200 uppercase tracking-wide flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Users
-              <Badge variant="outline" className="ml-2 text-xs text-neutral-400 border-neutral-700">
-                {users.length}
-              </Badge>
-            </CardTitle>
-            {!showUserForm && (
-              <Button
-                onClick={() => { resetUserForm(); setInviteSuccess(null); setShowUserForm(true); }}
-                className="bg-orange-600 hover:bg-orange-700 text-white text-sm"
-              >
-                <Plus className="w-4 h-4 mr-1.5" />
-                Invite User
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="px-6 pb-6 space-y-5">
+      <Panel
+        icon={Users}
+        title="Users"
+        subtitle={`${users.length} with access`}
+        action={
+          !showUserForm ? (
+            <Button
+              size="sm"
+              onClick={() => { resetUserForm(); setInviteSuccess(null); setShowUserForm(true); }}
+              className="h-7 bg-neutral-900 hover:bg-neutral-800 text-white text-xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Invite User
+            </Button>
+          ) : undefined
+        }
+      >
+        <div className={inviteSuccess || showUserForm ? "p-3 space-y-3 border-b border-neutral-200" : ""}>
           {/* Invite success banner */}
           {inviteSuccess && (
-            <div className={`p-4 rounded-md space-y-3 ${
+            <div className={`p-3 rounded-md space-y-2 ${
               inviteSuccess.emailSent
-                ? "bg-green-500/10 border border-green-500/20"
-                : "bg-orange-500/10 border border-orange-500/20"
+                ? "bg-green-50 border border-green-200"
+                : "bg-neutral-100 border border-neutral-200"
             }`}>
               <div className="flex items-center gap-2">
-                <CheckCircle className={`w-5 h-5 ${inviteSuccess.emailSent ? "text-green-400" : "text-orange-400"}`} />
-                <p className={`text-sm font-medium ${inviteSuccess.emailSent ? "text-green-400" : "text-orange-400"}`}>
+                <CheckCircle className={`w-5 h-5 ${inviteSuccess.emailSent ? "text-green-600" : "text-neutral-900"}`} />
+                <p className={`text-sm font-medium ${inviteSuccess.emailSent ? "text-green-600" : "text-neutral-900"}`}>
                   {inviteSuccess.emailSent
                     ? `Invite sent to ${inviteSuccess.email}`
                     : "Invite created"}
@@ -196,19 +188,19 @@ export default function UserManagement() {
               </div>
 
               {inviteSuccess.emailSent ? (
-                <p className="text-sm text-neutral-400">
+                <p className="text-[13px] text-neutral-500">
                   An email has been sent with a link to set up their account. The link expires in 72 hours.
                 </p>
               ) : (
                 <>
-                  <p className="text-sm text-neutral-400">
+                  <p className="text-[13px] text-neutral-500">
                     {inviteSuccess.inviteUrl
                       ? "Email is not configured. Share this invite link manually:"
                       : "The invite was created but the email could not be sent."}
                   </p>
                   {inviteSuccess.inviteUrl && (
-                    <div className="bg-neutral-900 border border-neutral-700 rounded p-3">
-                      <p className="text-sm text-orange-400 font-mono break-all">{inviteSuccess.inviteUrl}</p>
+                    <div className="bg-white border border-neutral-200 rounded p-3">
+                      <p className="text-sm text-neutral-900 tabular-nums break-all">{inviteSuccess.inviteUrl}</p>
                     </div>
                   )}
                 </>
@@ -222,55 +214,53 @@ export default function UserManagement() {
 
           {/* Invite form (new user) */}
           {showUserForm && !editingUser && (
-            <div className="bg-neutral-800/50 border border-neutral-700/50 rounded-md p-5 space-y-4">
+            <div className="bg-neutral-50 border border-neutral-200 rounded-md p-3 space-y-3">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-sm text-neutral-300 font-medium">Invite New User</p>
-                <button onClick={resetUserForm} className="text-neutral-500 hover:text-neutral-300">
+                <p className="text-[13px] text-neutral-800 font-medium">Invite New User</p>
+                <button onClick={resetUserForm} className="text-neutral-500 hover:text-neutral-700">
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <p className="text-sm text-neutral-500">
+              <p className="text-[13px] text-neutral-500">
                 Enter their email and role. They'll receive a link to set up their own username and password.
               </p>
 
               {userError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-sm">
+                <div className="p-3 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
                   {userError}
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-neutral-400 mb-1.5 block">Email</label>
+              <div className="space-y-3">
+                <Field label={<>Email</>}>
                   <Input
                     type="email"
                     value={userForm.email}
                     onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
                     placeholder="user@company.com"
                     required
-                    className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                    className="h-8 bg-white border-neutral-200 text-[13px] text-neutral-900 shadow-none"
                   />
-                </div>
-                <div>
-                  <label className="text-sm text-neutral-400 mb-1.5 block">Display Name <span className="text-neutral-600">(optional)</span></label>
+              </Field>
+                <Field label={<>Display Name <span className="text-neutral-400">(optional)</span></>}>
                   <Input
                     value={userForm.displayName}
                     onChange={(e) => setUserForm((f) => ({ ...f, displayName: e.target.value }))}
                     placeholder="Full name"
-                    className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                    className="h-8 bg-white border-neutral-200 text-[13px] text-neutral-900 shadow-none"
                   />
-                </div>
+              </Field>
               </div>
               <div>
-                <label className="text-sm text-neutral-400 mb-1.5 block">Role</label>
+                <label className="text-sm text-neutral-500 mb-1.5 block">Role</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setUserForm((f) => ({ ...f, role: "admin" }))}
                     className={`p-3 rounded-md border text-left transition-colors ${
                       userForm.role === "admin"
-                        ? "border-orange-500 bg-orange-500/10 text-white"
-                        : "border-neutral-700 bg-neutral-800 text-neutral-400 hover:border-neutral-600"
+                        ? "border-neutral-900 bg-neutral-100 text-neutral-900"
+                        : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:border-neutral-300"
                     }`}
                   >
                     <div className="text-sm font-medium">Administrator</div>
@@ -281,8 +271,8 @@ export default function UserManagement() {
                     onClick={() => setUserForm((f) => ({ ...f, role: "viewer" }))}
                     className={`p-3 rounded-md border text-left transition-colors ${
                       userForm.role === "viewer"
-                        ? "border-orange-500 bg-orange-500/10 text-white"
-                        : "border-neutral-700 bg-neutral-800 text-neutral-400 hover:border-neutral-600"
+                        ? "border-neutral-900 bg-neutral-100 text-neutral-900"
+                        : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:border-neutral-300"
                     }`}
                   >
                     <div className="text-sm font-medium">Viewer</div>
@@ -291,10 +281,10 @@ export default function UserManagement() {
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
-                <Button onClick={handleSendInvite} disabled={!userForm.email} className="bg-orange-600 hover:bg-orange-700 text-white text-sm">
+                <Button size="sm" onClick={handleSendInvite} disabled={!userForm.email} className="bg-neutral-900 hover:bg-neutral-800 text-white text-sm">
                   Send Invite
                 </Button>
-                <Button variant="ghost" onClick={resetUserForm} className="text-sm">
+                <Button variant="ghost" size="sm" onClick={resetUserForm} className="text-sm">
                   Cancel
                 </Button>
               </div>
@@ -303,63 +293,58 @@ export default function UserManagement() {
 
           {/* Edit form (existing user) */}
           {showUserForm && editingUser && (
-            <div className="bg-neutral-800/50 border border-neutral-700/50 rounded-md p-5 space-y-4">
+            <div className="bg-neutral-50 border border-neutral-200 rounded-md p-3 space-y-3">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-sm text-neutral-300 font-medium">Edit: {editingUser.username}</p>
-                <button onClick={resetUserForm} className="text-neutral-500 hover:text-neutral-300">
+                <p className="text-[13px] text-neutral-800 font-medium">Edit: {editingUser.username}</p>
+                <button onClick={resetUserForm} className="text-neutral-500 hover:text-neutral-700">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {userError && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded text-red-400 text-sm">
+                <div className="p-3 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
                   {userError}
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-neutral-400 mb-1.5 block">Display Name</label>
+              <div className="space-y-3">
+                <Field label={<>Display Name</>}>
                   <Input
                     value={editForm.displayName}
                     onChange={(e) => setEditForm((f) => ({ ...f, displayName: e.target.value }))}
                     placeholder="Full name"
-                    className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                    className="h-8 bg-white border-neutral-200 text-[13px] text-neutral-900 shadow-none"
                   />
-                </div>
-                <div>
-                  <label className="text-sm text-neutral-400 mb-1.5 block">Email</label>
+              </Field>
+                <Field label={<>Email</>}>
                   <Input
                     type="email"
                     value={editForm.email}
                     onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
                     placeholder="user@company.com"
-                    className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                    className="h-8 bg-white border-neutral-200 text-[13px] text-neutral-900 shadow-none"
                   />
-                </div>
-                <div>
-                  <label className="text-sm text-neutral-400 mb-1.5 block">
-                    Reset Password <span className="text-neutral-600">(leave blank to keep)</span>
-                  </label>
+              </Field>
+                <Field label={<>Reset Password <span className="text-neutral-400">(leave blank to keep)</span></>}>
                   <Input
                     type="password"
                     value={editForm.password}
                     onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))}
                     placeholder="Leave blank to keep current"
-                    className="bg-neutral-800 border-neutral-700 text-white text-base h-11"
+                    className="h-8 bg-white border-neutral-200 text-[13px] text-neutral-900 shadow-none"
                   />
-                </div>
+              </Field>
               </div>
               <div>
-                <label className="text-sm text-neutral-400 mb-1.5 block">Role</label>
+                <label className="text-sm text-neutral-500 mb-1.5 block">Role</label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setEditForm((f) => ({ ...f, role: "admin" }))}
                     className={`p-3 rounded-md border text-left transition-colors ${
                       editForm.role === "admin"
-                        ? "border-orange-500 bg-orange-500/10 text-white"
-                        : "border-neutral-700 bg-neutral-800 text-neutral-400 hover:border-neutral-600"
+                        ? "border-neutral-900 bg-neutral-100 text-neutral-900"
+                        : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:border-neutral-300"
                     }`}
                   >
                     <div className="text-sm font-medium">Administrator</div>
@@ -370,8 +355,8 @@ export default function UserManagement() {
                     onClick={() => setEditForm((f) => ({ ...f, role: "viewer" }))}
                     className={`p-3 rounded-md border text-left transition-colors ${
                       editForm.role === "viewer"
-                        ? "border-orange-500 bg-orange-500/10 text-white"
-                        : "border-neutral-700 bg-neutral-800 text-neutral-400 hover:border-neutral-600"
+                        ? "border-neutral-900 bg-neutral-100 text-neutral-900"
+                        : "border-neutral-200 bg-neutral-50 text-neutral-500 hover:border-neutral-300"
                     }`}
                   >
                     <div className="text-sm font-medium">Viewer</div>
@@ -380,84 +365,99 @@ export default function UserManagement() {
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
-                <Button onClick={handleUpdateUser} className="bg-orange-600 hover:bg-orange-700 text-white text-sm">
+                <Button size="sm" onClick={handleUpdateUser} className="bg-neutral-900 hover:bg-neutral-800 text-white text-sm">
                   Update User
                 </Button>
-                <Button variant="ghost" onClick={resetUserForm} className="text-sm">
+                <Button variant="ghost" size="sm" onClick={resetUserForm} className="text-sm">
                   Cancel
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Users list */}
-          {usersLoading ? (
-            <div className="flex justify-center py-6">
-              <Loader2 className="w-6 h-6 animate-spin text-neutral-500" />
-            </div>
-          ) : users.length === 0 ? (
-            <p className="text-sm text-neutral-500 text-center py-6">No users found</p>
-          ) : (
-            <div className="space-y-3">
-              {users.map((u) => (
-                <div
-                  key={u.id}
-                  className="flex items-center justify-between p-4 bg-neutral-800/50 border border-neutral-700/50 rounded-md"
-                >
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center text-sm text-neutral-300 font-medium shrink-0">
-                      {u.displayName?.charAt(0)?.toUpperCase() || u.username.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-base text-white truncate">{u.displayName || u.username}</span>
-                        <Badge variant="outline" className={`text-xs ${ROLE_COLORS[u.role] || ""}`}>
-                          {ROLE_LABELS[u.role] || u.role}
-                        </Badge>
-                        {u.status === "pending" && (
-                          <Badge variant="outline" className="text-xs bg-yellow-500/10 border-yellow-500/30 text-yellow-400">
-                            Pending
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-neutral-500 truncate">
-                        {u.status === "pending" ? u.email : `${u.username}${u.email ? ` - ${u.email}` : ""}`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0 ml-3">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => startEditUser(u)}
-                      className="h-9 w-9 text-neutral-500 hover:text-orange-400"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDeleteUser(u.id)}
-                      className="h-9 w-9 text-neutral-500 hover:text-red-400"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        </div>
 
-          {/* RBAC legend */}
-          <div className="bg-neutral-800/50 border border-neutral-700/50 rounded-md p-4">
-            <p className="text-sm text-neutral-300 font-medium mb-3">Role Permissions</p>
-            <div className="space-y-2 text-sm text-neutral-400">
-              <div><span className="text-red-400 font-medium">Administrator</span> — Full access: dashboard, reports, alerts, settings (edit), user management, Sentinel config</div>
-              <div><span className="text-neutral-300 font-medium">Viewer</span> — Read-only: dashboard, reports, alerts, settings (view only)</div>
-            </div>
+        {/* Users list */}
+        {usersLoading ? (
+          <div className="flex justify-center py-6">
+            <Loader2 className="w-5 h-5 animate-spin text-neutral-500" />
           </div>
-        </CardContent>
-      </Card>
+        ) : users.length === 0 ? (
+          <p className="text-[13px] text-neutral-500 text-center py-6">No users found</p>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className={th}>User</th>
+                <th className={th}>Email</th>
+                <th className={th}>Role</th>
+                <th className={th}>Status</th>
+                <th className={`${th} w-20`} />
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td className={td}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-6 h-6 rounded-full bg-neutral-100 flex items-center justify-center text-[11px] text-neutral-700 font-medium shrink-0">
+                        {u.displayName?.charAt(0)?.toUpperCase() || u.username.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-medium truncate">{u.displayName || u.username}</span>
+                      {u.status !== "pending" && <span className="text-neutral-400 truncate">{u.username}</span>}
+                    </div>
+                  </td>
+                  <td className={`${td} text-neutral-600`}>{u.email || "—"}</td>
+                  <td className={td}>
+                    <Tag tone={u.role === "admin" ? "red" : "neutral"}>{ROLE_LABELS[u.role] || u.role}</Tag>
+                  </td>
+                  <td className={td}>
+                    <Tag tone={u.status === "pending" ? "yellow" : "green"}>{u.status === "pending" ? "Pending" : "Active"}</Tag>
+                  </td>
+                  <td className={`${td} text-right`}>
+                    <div className="flex items-center justify-end gap-0.5">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Edit ${u.username}`}
+                        onClick={() => startEditUser(u)}
+                        className="h-7 w-7 text-neutral-500 hover:text-neutral-900"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete ${u.username}`}
+                        onClick={() => handleDeleteUser(u.id)}
+                        className="h-7 w-7 text-neutral-500 hover:text-red-600"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Panel>
+
+      {/* RBAC legend */}
+      <Panel icon={Shield} title="Role Permissions">
+        <table className="w-full">
+          <tbody>
+            <tr>
+              <td className={`${td} w-40`}><Tag tone="red">Administrator</Tag></td>
+              <td className={`${td} text-neutral-600`}>Full access: dashboard, reports, alerts, settings (edit), user management, Sentinel config</td>
+            </tr>
+            <tr>
+              <td className={td}><Tag>Viewer</Tag></td>
+              <td className={`${td} text-neutral-600`}>Read-only: dashboard, reports, alerts, settings (view only)</td>
+            </tr>
+          </tbody>
+        </table>
+      </Panel>
     </div>
   );
 }

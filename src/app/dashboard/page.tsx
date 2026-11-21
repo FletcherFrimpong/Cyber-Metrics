@@ -1,12 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Panel, Tag } from "@/components/ui/panel"
 import { Shield } from "lucide-react"
 import FinancialMetrics from "@/components/dashboard/financial-metrics"
 import BusinessUnits from "@/components/dashboard/business-units"
-import edrDataService from "@/lib/edr-data-service"
+import { useDashboardData } from "@/hooks/useDashboardData"
 import { formatCurrency } from "@/lib/utils"
 
 interface DashboardPageProps {
@@ -15,73 +13,76 @@ interface DashboardPageProps {
 }
 
 export default function DashboardPage({ selectedQuarter, timeView }: DashboardPageProps) {
-  const summary = useMemo(() => {
-    const departments = edrDataService.getDepartmentBreakdown(selectedQuarter);
-    const data = edrDataService.getTimeframeAlerts(selectedQuarter);
-    const allAlerts = [...data.edr, ...data.email, ...data.network, ...data.web, ...data.cloud];
-    const totalAlerts = allAlerts.length;
-    const totalCost = allAlerts.reduce((sum, a) => sum + (a.costImpact || 0), 0);
-    const criticalCount = allAlerts.filter(a => a.severity === "Critical").length;
-    const topDept = departments[0];
-
-    return { totalAlerts, totalCost, criticalCount, topDept, deptCount: departments.length };
-  }, [selectedQuarter]);
+  const { data } = useDashboardData(timeView, selectedQuarter);
+  const summary = {
+    totalAlerts: data?.totalAlerts ?? 0,
+    // Risk-adjusted expected loss avoided, from the server
+    totalCost: data?.costMetrics.totalCostImpact ?? 0,
+    criticalCount: data?.severityCounts.Critical ?? 0,
+    topDept: data?.departments[0],
+    deptCount: data?.departments.length ?? 0,
+  };
 
   const getRiskLabel = () => {
-    if (summary.criticalCount > 5) return { label: "High", color: "text-red-600" };
-    if (summary.criticalCount > 0 || summary.totalAlerts > 50) return { label: "Medium", color: "text-orange-600" };
-    if (summary.totalAlerts > 0) return { label: "Low", color: "text-green-600" };
-    return { label: "No Data", color: "text-neutral-500" };
+    if (summary.criticalCount > 5) return { label: "High", tone: "red" as const };
+    if (summary.criticalCount > 0 || summary.totalAlerts > 50) return { label: "Medium", tone: "orange" as const };
+    if (summary.totalAlerts > 0) return { label: "Low", tone: "green" as const };
+    return { label: "No Data", tone: "neutral" as const };
   };
 
   const risk = getRiskLabel();
 
-  return (
-    <div className="space-y-6 pb-12 min-h-full">
-      {/* Executive Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5" />
-            Executive Summary
-            <Badge variant="secondary" className="ml-auto">
-              {timeView === "quarterly" ? selectedQuarter : "Yearly Analysis"}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-600">Top Affected Department</p>
-              <p className="text-2xl font-bold">{summary.topDept?.name || "—"}</p>
-              <p className="text-sm text-neutral-500">
-                {summary.topDept ? `${summary.topDept.alerts} incidents` : "Connect Sentinel to see data"}
-              </p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-600">Total Incidents</p>
-              <p className="text-2xl font-bold">{summary.totalAlerts.toLocaleString()}</p>
-              <p className="text-sm text-neutral-500">Across {summary.deptCount} departments</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-600">Risk Level</p>
-              <p className={`text-2xl font-bold ${risk.color}`}>{risk.label}</p>
-              <p className="text-sm text-neutral-500">{summary.criticalCount} critical incidents</p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-neutral-600">Cost Impact</p>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(summary.totalCost)}</p>
-              <p className="text-sm text-neutral-500">Potential losses prevented</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+  const cells = [
+    {
+      label: "Cost Impact",
+      value: formatCurrency(summary.totalCost),
+      note: "Potential losses prevented",
+      lead: true,
+    },
+    {
+      label: "Risk Level",
+      value: <Tag tone={risk.tone}>{risk.label}</Tag>,
+      note: `${summary.criticalCount} critical incidents`,
+    },
+    {
+      label: "Total Incidents",
+      value: summary.totalAlerts.toLocaleString(),
+      note: `Across ${summary.deptCount} departments`,
+    },
+    {
+      label: "Top Affected Department",
+      value: summary.topDept?.name || "—",
+      note: summary.topDept ? `${summary.topDept.alerts} incidents` : "Connect Sentinel to see data",
+    },
+  ];
 
-      {/* Top Affected Departments — from Azure AD */}
-      <BusinessUnits selectedQuarter={selectedQuarter} />
+  return (
+    <div className="space-y-3 pb-6 min-h-full">
+      {/* Executive Summary */}
+      <Panel
+        icon={Shield}
+        title="Executive Summary"
+        subtitle={timeView === "quarterly" ? selectedQuarter : "Yearly Analysis"}
+        action={data?.usingSampleData ? <Tag tone="yellow">Demo data</Tag> : undefined}
+      >
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-neutral-200">
+          {cells.map((cell) => (
+            <div key={cell.label} className="px-3 py-3 min-w-0 bg-white">
+              <div className="text-[12px] text-neutral-500">{cell.label}</div>
+              <div className={`mt-1 font-semibold tabular-nums text-neutral-900 truncate ${cell.lead ? "text-2xl" : "text-lg"}`}>
+                {cell.value}
+              </div>
+              <div className="mt-0.5 text-[12px] text-neutral-400 truncate">{cell.note}</div>
+            </div>
+          ))}
+        </div>
+      </Panel>
 
       {/* Financial Metrics */}
       <FinancialMetrics timeView={timeView} selectedQuarter={selectedQuarter} />
+
+      {/* Top Affected Departments — from Azure AD */}
+      <BusinessUnits selectedQuarter={selectedQuarter} timeView={timeView} />
     </div>
   )
 }

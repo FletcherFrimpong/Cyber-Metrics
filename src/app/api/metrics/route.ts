@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { calculateCostMetrics } from "@/lib/cost-calculations";
 import edrDataService from "@/lib/edr-data-service";
 import { requireAuth, isAuthError } from "@/lib/auth/api-guard";
+import { startSavedConnectors } from "@/lib/connectors/runtime";
 
 export async function GET(request: NextRequest) {
+  startSavedConnectors();
   const auth = await requireAuth("dashboard:view");
   if (isAuthError(auth)) return auth;
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "./session";
 import { hasPermission } from "./rbac";
+import { getUserById } from "./user-store";
 import type { Permission, SessionPayload } from "./types";
 
 /**
@@ -16,11 +17,18 @@ export async function requireAuth(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (permission && !hasPermission(session.role, permission)) {
+  // A signed token is not enough: the account must still exist, and its
+  // CURRENT role applies, so deleting or demoting a user takes effect at once.
+  const user = getUserById(session.userId);
+  if (!user || user.status === "pending") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (permission && !hasPermission(user.role, permission)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  return session;
+  return { ...session, role: user.role };
 }
 
 /**

@@ -37,6 +37,21 @@ SignalFoundry maps alerts from 80+ security products into 5 categories:
 | **Web** | Azure WAF, Cloudflare, Akamai, Imperva, F5 |
 | **Cloud** | Defender for Cloud, AWS GuardDuty, Prisma Cloud, Wiz, Orca |
 
+## Data Sources
+
+Configure these under **Settings**. Each one pulls closed or resolved alerts every 15 minutes, with the analyst's verdict.
+
+| Source | Kind | What it pulls | Credentials |
+|--------|------|---------------|-------------|
+| **Microsoft Sentinel** | Log source (SIEM) | Resolved incidents and their alerts, all categories | Azure AD app registration |
+| **Splunk Enterprise Security** | Log source (SIEM) | Closed notable events (findings) with disposition, all categories | Management URL (port 8089) + authentication token |
+| **CrowdStrike Falcon** | Direct tool | Closed alerts (endpoint, identity, cloud workload) | API client with `Alerts: Read` |
+| **SentinelOne** | Direct tool | Resolved threats (endpoint) | Console URL + service-user API token |
+
+A SIEM already aggregates your security tools, so connect one log source and leave the direct tool connections for tools that do **not** feed it. Connecting a tool both ways counts its alerts twice.
+
+Connectors live in `src/lib/connectors/`. To add one, implement `ConnectorDefinition` (`types.ts`) and list it in `registry.ts`. `npm test` runs each connector against a local server that answers the way the vendor's documentation describes; none has been run against a live customer tenant yet.
+
 ## Quick Start
 
 ### 1. Install and run
@@ -310,20 +325,29 @@ src/
 
 ## Key Calculations
 
-**True Positive Identification:**
+The model lives in `src/lib/risk-model.ts`; every judgment-based parameter is in `DEFAULT_RISK_CONFIG` at the top of that file. Run `npm test` to check it.
 
-An alert is validated as a true positive if ANY of these conditions are met:
+**1. Alerts are grouped into incidents.** Alerts that share a Sentinel incident are one loss event, valued at the largest benchmark among them, not one loss each.
+
+**2. Is the incident real? `P(real)`**
+
 ```
-Path 1: Has MITRE ATT&CK technique(s) with avg risk >= 0.6 AND confidence >= 70%
-Path 2: Severity is Critical or High (strong signal from the detection tool)
-Path 3: Confidence >= 90% (detection tool is highly certain)
+Analyst classified it truePositive                  -> 1
+Analyst classified it falsePositive / benign        -> 0 (excluded)
+No analyst verdict:
+  known MITRE technique AND tool confidence >= 70%  -> confidence
+  no MITRE technique AND tool confidence >= 90%     -> confidence
+  known MITRE technique, no confidence reported     -> 0.5
+  otherwise                                         -> 0 (excluded)
 ```
 
-This ensures high-severity alerts from products that don't emit MITRE data (common with newer tools) are still counted, while filtering out genuine noise.
+Severity alone never makes an alert count. The dashboard shows how much of the result rests on analyst-confirmed incidents.
 
-**Cost Per Incident (Industry Benchmarks):**
+**3. Would it have escalated? `P(escalation)`** is set by the furthest MITRE ATT&CK tactic observed, from 2% (reconnaissance) to 75% (impact). With no tactic it falls back to severity (Critical 30%, High 15%, Medium 5%, Low 1%). These are default assumptions, not published figures; calibrate them per customer.
 
-Each alert's `costImpact` is derived from its category + severity using published research:
+**4. What would it have cost? (Industry Benchmarks)**
+
+Each alert's `costImpact` is the loss had the incident escalated, looked up by category + severity:
 
 | | Critical | High | Medium | Low | Source |
 |---|---|---|---|---|---|
@@ -337,13 +361,14 @@ Sources: IBM Cost of a Data Breach 2024, FBI IC3 2024, Ponemon Institute 2023, V
 
 **Risk Quantification:**
 ```
-costImpact = lookup(alert.category, alert.severity)  -- from benchmark matrix
-totalCostImpact = SUM(truePositive.costImpact)        -- only validated alerts
-totalCostSavings = totalCostImpact - investmentAmount  -- your configured spend
-ROI = (totalCostSavings / investmentAmount) * 100
+loss avoided per incident = P(real) x P(escalation) x benchmark loss
+expected loss avoided     = SUM over incidents
+range (5th-95th pct)      = Monte Carlo, 5,000 trials, seeded so results repeat
+investment for the period = annual investment x (1, 1/4 or 1/12)
+ROI                       = (loss avoided - investment) / investment x 100
 ```
 
-Every number is traceable: benchmark cites its source, category comes from the product name, severity comes from the alert.
+The dashboard reports the expected value with its range, the ROI range, and "gross exposure" (the undiscounted benchmark sum) as an upper bound for comparison.
 
 **Department Resolution (Top Affected Units):**
 
@@ -440,7 +465,7 @@ For real-time ingestion (instead of waiting for the 15-min poll):
 - **Auth**: JWT (jose) + bcryptjs, HttpOnly cookies, RBAC (admin/viewer)
 - **Email**: Nodemailer (any SMTP provider)
 - **SIEM**: Microsoft Graph Security API (OAuth2 client_credentials)
-- **Data**: In-memory alert store + file-backed settings (`.data/`), alerts re-fetched from Sentinel on restart
+- **Data**: Alerts are stored in a SQLite file (`.data/signalfoundry.db`, Node's built-in driver, needs Node 22.13+) and loaded into memory on startup, so history survives a restart. Settings and users are JSON files in `.data/`. Back up the `.data/` folder to back up everything
 
 ## Environment Variables
 

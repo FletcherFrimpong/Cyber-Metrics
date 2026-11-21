@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import edrDataService from '@/lib/edr-data-service';
 import { requireAuth, isAuthError } from '@/lib/auth/api-guard';
+import { startSavedConnectors } from "@/lib/connectors/runtime";
 
 export async function GET(request: NextRequest) {
+  startSavedConnectors();
   const auth = await requireAuth("alerts:view");
   if (isAuthError(auth)) return auth;
 

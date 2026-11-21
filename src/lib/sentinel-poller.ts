@@ -31,13 +31,19 @@ export class SentinelPoller {
   private lastResult: PollResult | null = null;
   private errors: string[] = [];
 
+  // Optional durable high-water mark, so a restart resumes instead of re-fetching 90 days
+  private state?: { get(): string | null; set(value: string): void };
+
   constructor(
     config: SentinelConfig,
-    onAlerts: (alerts: AzureSentinelAlert[], category: AlertCategory) => void
+    onAlerts: (alerts: AzureSentinelAlert[], category: AlertCategory) => void,
+    state?: { get(): string | null; set(value: string): void }
   ) {
     this.client = new SentinelClient(config);
     this.intervalMs = config.pollingIntervalMs;
     this.onAlerts = onAlerts;
+    this.state = state;
+    this.lastPollTime = state?.get() ?? null;
   }
 
   // Start polling
@@ -104,6 +110,7 @@ export class SentinelPoller {
   // Core poll logic
   private async doPoll(since?: string): Promise<PollResult> {
     this.isPolling = true;
+    const pollStartedAt = new Date().toISOString();
     const categories: Record<AlertCategory, number> = { edr: 0, email: 0, network: 0, web: 0, cloud: 0 };
     let newAlerts = 0;
 
@@ -127,7 +134,9 @@ export class SentinelPoller {
         }
       }
 
-      this.lastPollTime = new Date().toISOString();
+      // Use the time the poll STARTED, so nothing changed during it is missed next time
+      this.lastPollTime = pollStartedAt;
+      this.state?.set(pollStartedAt);
       this.totalFetched += incidents.length;
 
       const result: PollResult = {
