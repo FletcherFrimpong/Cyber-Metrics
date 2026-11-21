@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
   if (isAuthError(auth)) return auth;
 
   const body = await request.json();
+  const hadSentinel = !!getSettings().sentinel?.tenantId;
 
   const s = updateSettings({
     investmentAmount: body.investmentAmount,
@@ -54,11 +55,21 @@ export async function POST(request: NextRequest) {
     smtp: body.smtp,
   });
 
-  // Try to connect Sentinel if credentials are present
-  if (s.sentinel?.tenantId) {
+  // Connect Sentinel when credentials were sent; disconnect when it was explicitly removed.
+  if (body.sentinel && s.sentinel?.tenantId) {
     try {
       const mod = await import("@/lib/edr-data-service");
       await mod.default.connectSentinel(s.sentinel);
+    } catch {}
+  } else if (body.sentinel === null && hadSentinel) {
+    try {
+      const mod = await import("@/lib/edr-data-service");
+      const { getConnectorManager, CONNECTORS } = await import("@/lib/connectors/runtime");
+      await mod.default.connectSentinel({ tenantId: "", clientId: "", clientSecret: "" });
+      mod.default.removeBySourcePrefix("SENTINEL-");
+      mod.default.setSourceState("sentinel", null);
+      const manager = getConnectorManager();
+      if (!CONNECTORS.some((c) => manager.isRunning(c.id))) mod.default.restoreSampleData();
     } catch {}
   }
 
