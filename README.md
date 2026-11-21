@@ -145,8 +145,8 @@ The login page follows the access policy:
 Requires **Node.js 22.13 or later**.
 
 ```bash
-git clone https://github.com/FletcherFrimpong/Cyber-Metrics.git
-cd Cyber-Metrics
+git clone https://github.com/FletcherFrimpong/Signal-Foundry.git
+cd Signal-Foundry
 npm install
 npm run dev
 ```
