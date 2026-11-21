@@ -43,6 +43,7 @@ const EMPTY_METRICS: DashboardMetrics = {
 export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAnalyticsProps) {
   const { data, loading, error } = useDashboardData(timeView, selectedQuarter);
   const [isExporting, setIsExporting] = useState(false);
+  const [trendMetric, setTrendMetric] = useState<"alerts" | "incidentsCounted" | "truePositiveRate" | "triageCoverage" | "cost">("alerts");
 
   const costMetrics = data?.costMetrics ?? EMPTY_METRICS;
   const totalAlerts = data?.totalAlerts ?? 0;
@@ -70,18 +71,66 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
     return out;
   }, [data]);
 
-  // KRI metrics derived from data
-  const kriMetrics = useMemo(() => {
-    const fpRate = totalAlerts > 0 ? (100 - costMetrics.truePositiveRate) : 0;
+  // The selected quarter against the one before it
+  // In a yearly view that is the latest quarter that has started.
+  const yearly = timeView === "yearly";
+  const started = trendData.filter((t) => !t.future);
+  const current = (yearly ? undefined : trendData.find((t) => t.quarter === selectedQuarter)) ?? started[started.length - 1] ?? trendData[trendData.length - 1];
+  const previous = current ? trendData[trendData.indexOf(current) - 1] : undefined;
+
+  type Indicator = { label: string; now: string; before: string; delta: number | null; unit: "%" | "pts"; goodWhen: "up" | "down" | "none"; hint: string };
+  const indicators: Indicator[] = useMemo(() => {
+    if (!current) return [];
+    const pctChange = (a: number, b?: number) => (b && b > 0 ? ((a - b) / b) * 100 : null);
+    const ptChange = (a: number, b?: number) => (b === undefined ? null : a - b);
+    // A quarter that is still running is compared on pace: its count so far scaled to a full quarter
+    const paced = (n: number) => n / current.elapsedShare;
     return [
-      { label: "True Positive Rate", value: costMetrics.truePositiveRate, unit: "%", good: costMetrics.truePositiveRate > 20 },
-      { label: "False Positive Rate", value: Math.round(fpRate * 10) / 10, unit: "%", good: fpRate < 80 },
-      { label: "Risk Quantified", value: costMetrics.totalCostImpact >= 1000000 ? Math.round(costMetrics.totalCostImpact / 1000000 * 10) / 10 : Math.round(costMetrics.totalCostImpact / 1000), unit: costMetrics.totalCostImpact >= 1000000 ? "M" : "K", good: true },
-      { label: "ROI", value: costMetrics.roi, unit: "%", good: costMetrics.roi > 0 },
-      { label: "Investment", value: costMetrics.totalInvestment / 1000, unit: "K", good: true },
-      { label: "Coverage", value: categoryCounts.filter(c => c.count > 0).length, unit: `/${categoryCounts.length}`, good: true },
+      { label: "Alerts", now: current.alerts.toLocaleString(), before: previous ? previous.alerts.toLocaleString() : "—", delta: pctChange(paced(current.alerts), previous?.alerts), unit: "%", goodWhen: "none", hint: "Alerts from closed incidents" },
+      { label: "Critical alerts", now: String(current.critical), before: previous ? String(previous.critical) : "—", delta: pctChange(paced(current.critical), previous?.critical), unit: "%", goodWhen: "down", hint: "Alerts rated critical by the source" },
+      { label: "Incidents counted", now: current.incidentsCounted.toLocaleString(), before: previous ? previous.incidentsCounted.toLocaleString() : "—", delta: pctChange(paced(current.incidentsCounted), previous?.incidentsCounted), unit: "%", goodWhen: "none", hint: "Real incidents your controls caught" },
+      { label: "True-positive rate", now: `${current.truePositiveRate.toFixed(1)}%`, before: previous ? `${previous.truePositiveRate.toFixed(1)}%` : "—", delta: ptChange(current.truePositiveRate, previous?.truePositiveRate), unit: "pts", goodWhen: "up", hint: "Share of alerts that were real: higher means less noise" },
+      { label: "Triage coverage", now: `${current.triageCoverage.toFixed(1)}%`, before: previous ? `${previous.triageCoverage.toFixed(1)}%` : "—", delta: ptChange(current.triageCoverage, previous?.triageCoverage), unit: "pts", goodWhen: "up", hint: "Share of alerts an analyst gave a verdict" },
+      { label: "Control effectiveness", now: `${current.controlEffectiveness.toFixed(1)}%`, before: previous ? `${previous.controlEffectiveness.toFixed(1)}%` : "—", delta: ptChange(current.controlEffectiveness, previous?.controlEffectiveness), unit: "pts", goodWhen: "up", hint: "Share of exposure your controls removed" },
+      { label: "Expected loss avoided", now: fmt(current.cost), before: previous ? fmt(previous.cost) : "—", delta: pctChange(current.cost, previous?.cost), unit: "%", goodWhen: "up", hint: "Exposure × control effectiveness" },
     ];
-  }, [totalAlerts, costMetrics, categoryCounts]);
+  }, [current, previous]);
+
+  // What moved most since the previous quarter, in a sentence
+  const headline = useMemo(() => {
+    if (!current || !previous || previous.alerts === 0) return null;
+    const scale = 1 / current.elapsedShare;
+    const volume = ((current.alerts * scale - previous.alerts) / previous.alerts) * 100;
+    const moves = (Object.keys(CATEGORY_LABELS) as CategoryKey[])
+      .map((k) => {
+        const before = previous.byCategory[k] ?? 0;
+        const now = (current.byCategory[k] ?? 0) * scale;
+        return { label: CATEGORY_LABELS[k], change: before > 0 ? ((now - before) / before) * 100 : 0, diff: now - before };
+      })
+      .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+    const top = moves[0];
+    const parts: string[] = [];
+    if (current.inProgress) {
+      parts.push(
+        `${current.quarter} is ${Math.round(current.elapsedShare * 100)}% through with ${current.alerts.toLocaleString()} alerts so far, on pace for about ${Math.round(current.alerts * scale).toLocaleString()} (${previous.quarter}: ${previous.alerts.toLocaleString()})`
+      );
+    } else {
+      parts.push(Math.abs(volume) < 1 ? `Alert volume is level with ${previous.quarter}` : `Alert volume is ${volume > 0 ? "up" : "down"} ${Math.abs(volume).toFixed(0)}% on ${previous.quarter}`);
+    }
+    if (top && Math.abs(top.change) >= 1) parts.push(`the biggest move is ${top.label}, ${top.change > 0 ? "up" : "down"} ${Math.abs(top.change).toFixed(0)}%${current.inProgress ? " on pace" : ""}`);
+    const triage = current.triageCoverage - previous.triageCoverage;
+    if (Math.abs(triage) >= 1) parts.push(`analysts gave a verdict on ${current.triageCoverage.toFixed(0)}% of alerts, ${triage > 0 ? "up" : "down"} from ${previous.triageCoverage.toFixed(0)}%`);
+    return parts.join("; ") + ".";
+  }, [current, previous]);
+
+  type TrendMetric = "alerts" | "incidentsCounted" | "truePositiveRate" | "triageCoverage" | "cost";
+  const TREND_METRICS: { id: TrendMetric; label: string; format: (n: number) => string; note: string }[] = [
+    { id: "alerts", label: "Alerts", format: (n) => n.toLocaleString(), note: "Alerts from closed incidents" },
+    { id: "incidentsCounted", label: "Incidents", format: (n) => n.toLocaleString(), note: "Real incidents your controls caught" },
+    { id: "truePositiveRate", label: "True-positive rate", format: (n) => `${n.toFixed(1)}%`, note: "Share of alerts that were real" },
+    { id: "triageCoverage", label: "Triage", format: (n) => `${n.toFixed(1)}%`, note: "Share of alerts given an analyst verdict" },
+    { id: "cost", label: "Loss avoided", format: fmt, note: "Steady by design: it follows your size and how reliably incidents are caught, not alert volume" },
+  ];
 
   const handleExportReport = async () => {
     if (typeof window === "undefined") return;
@@ -115,13 +164,9 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
 
 
   const periodLabel = timeView === "quarterly" ? selectedQuarter : selectedQuarter.split(" ")[1];
-  const maxTrendCost = Math.max(...trendData.map(t => t.cost), 1);
-  const tone = (value: string) =>
-    value === "High" || value === "Elevated" || value === "Needs Review"
-      ? "red"
-      : value === "Medium" || value === "Moderate" || value === "Adequate"
-      ? "yellow"
-      : "green";
+  const metric = TREND_METRICS.find((m) => m.id === trendMetric)!;
+  const maxTrend = Math.max(...trendData.map((t) => t[trendMetric]), 1);
+  const maxCategoryCell = Math.max(...trendData.flatMap((t) => Object.values(t.byCategory)), 1);
   const signed = (n: number) => (n < 0 ? `-${fmt(-n)}` : fmt(n));
 
   // Headline: how much the risk of a loss is reduced, then the dollars.
@@ -179,11 +224,18 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
               <div className={`mt-1 font-semibold tabular-nums ${stat.lead ? "text-2xl" : "text-lg"} text-neutral-900`}>
                 {stat.value}
               </div>
-              <div className="mt-0.5 text-[12px] text-neutral-400 truncate">{stat.note}</div>
+              <div className="mt-0.5 text-[12px] leading-snug text-neutral-400">{stat.note}</div>
             </div>
           ))}
         </div>
       </div>
+
+      {data && !data.usingSampleData && totalAlerts === 0 && (
+        <p className="px-1 text-[13px] text-neutral-600">
+          No closed incidents in {periodLabel}. The figures below assume a typical organisation of your size; they will reflect your own
+          controls once incidents for this period arrive.
+        </p>
+      )}
 
       {/* What the dollar figures are anchored to */}
       {data && (
@@ -195,20 +247,44 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
         </p>
       )}
 
-      {/* Loss avoided by quarter + categories */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <Panel icon={TrendingUp} title="Quarterly trend" subtitle="Expected loss avoided and alert volume by quarter">
-          <div className="flex items-end gap-4 h-52 px-4 pt-4">
-            {trendData.map((q, i) => {
-              const prev = i > 0 ? trendData[i - 1] : null;
-              const change = prev && prev.alerts > 0 ? ((q.alerts - prev.alerts) / prev.alerts) * 100 : 0;
-              const isSelected = q.quarter === selectedQuarter;
+      {headline && (
+        <p className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-[13px] text-neutral-700">
+          <span className="font-medium text-neutral-900">{yearly ? "Latest quarter: " : "What changed: "}</span>{headline}
+        </p>
+      )}
+
+      {/* The last four quarters: one metric at a time, then by category */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        <Panel
+          icon={TrendingUp}
+          title="Four-quarter trend"
+          subtitle={metric.note}
+        >
+          <div className="px-3 pt-3 overflow-x-auto">
+            <div role="tablist" aria-label="Trend metric" className="inline-flex items-center gap-0.5 rounded-md border border-neutral-200 bg-neutral-50 p-0.5">
+              {TREND_METRICS.map((m) => (
+                <button
+                  key={m.id}
+                  role="tab"
+                  aria-selected={trendMetric === m.id}
+                  onClick={() => setTrendMetric(m.id)}
+                  className={`h-6 px-2 rounded text-[12px] whitespace-nowrap ${trendMetric === m.id ? "bg-white text-neutral-900 font-medium shadow-sm" : "text-neutral-600 hover:text-neutral-900"}`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-end gap-4 h-44 px-4 pt-3">
+            {trendData.map((q) => {
+              const isSelected = !yearly && q.quarter === selectedQuarter;
+              const value = q[trendMetric];
               return (
                 <div key={q.quarter} className="flex-1 h-full flex flex-col items-center justify-end min-w-0">
-                  <div className="text-[12px] text-neutral-700 tabular-nums mb-1">{fmt(q.cost)}</div>
+                  <div className={`text-[12px] tabular-nums mb-1 ${isSelected ? "font-medium text-neutral-900" : "text-neutral-600"}`}>{metric.format(value)}</div>
                   <div
-                    className={`w-full max-w-16 rounded-t ${isSelected ? "bg-neutral-900" : "bg-neutral-200"}`}
-                    style={{ height: `${Math.max(2, (q.cost / maxTrendCost) * 100)}%` }}
+                    className={`w-full max-w-16 rounded-t ${isSelected ? "bg-neutral-900" : "bg-neutral-300"} ${q.inProgress ? "opacity-60" : ""}`}
+                    style={{ height: `${Math.max(2, (value / maxTrend) * 100)}%` }}
                   />
                 </div>
               );
@@ -217,46 +293,69 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
           <div className="flex gap-4 px-4 py-2 border-t border-neutral-200">
             {trendData.map((q, i) => {
               const prev = i > 0 ? trendData[i - 1] : null;
-              const change = prev && prev.alerts > 0 ? ((q.alerts - prev.alerts) / prev.alerts) * 100 : 0;
-              const isSelected = q.quarter === selectedQuarter;
+              const isRate = trendMetric === "truePositiveRate" || trendMetric === "triageCoverage";
+              const change = !prev ? null : isRate ? q[trendMetric] - prev[trendMetric] : prev[trendMetric] > 0 ? ((q[trendMetric] - prev[trendMetric]) / prev[trendMetric]) * 100 : null;
+              const isSelected = !yearly && q.quarter === selectedQuarter;
               return (
                 <div key={q.quarter} className="flex-1 text-center min-w-0">
                   <div className={`text-[12px] ${isSelected ? "font-medium text-neutral-900" : "text-neutral-500"}`}>{q.quarter}</div>
                   <div className="text-[11px] text-neutral-400 tabular-nums">
-                    {q.alerts} alerts
-                    {i > 0 && change !== 0 && (
-                      <span className={change > 0 ? "text-red-600" : "text-green-600"}> {change > 0 ? "+" : ""}{change.toFixed(0)}%</span>
-                    )}
+                    {q.future ? "not started" : q.inProgress ? "in progress" : i === 0 || change === null ? "\u00a0" : Math.abs(change) < 0.5 ? "no change" : `${change > 0 ? "+" : ""}${change.toFixed(0)}${isRate ? " pts" : "%"}`}
                   </div>
                 </div>
               );
             })}
           </div>
         </Panel>
-
-        <Panel icon={Shield} title="Alert categories" subtitle="Volume and loss avoided by security tool type">
-          <table className="w-full">
-            <thead>
-              <tr>
-                <th className={`${th} w-8`}>#</th>
-                <th className={th}>Category</th>
-                <th className={`${th} text-right`}>Alerts</th>
-                <th className={`${th} text-right`}>Critical</th>
-                <th className={`${th} text-right`}>Loss avoided</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...categoryCounts].sort((a, b) => b.cost - a.cost || b.count - a.count).map((cat, i) => (
-                <tr key={cat.key}>
-                  <td className={`${td} text-neutral-400 tabular-nums`}>{i + 1}</td>
-                  <td className={`${td} font-medium`}>{cat.label}</td>
-                  <td className={`${td} text-right tabular-nums`}>{cat.count}</td>
-                  <td className={`${td} text-right tabular-nums ${cat.critical > 0 ? "text-red-600" : "text-neutral-300"}`}>{cat.critical}</td>
-                  <td className={`${td} text-right tabular-nums`}>{cat.count > 0 ? fmt(cat.cost) : "—"}</td>
+        <Panel icon={Shield} title="Categories by quarter" subtitle="Alert volume for each control area; darker is busier">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr>
+                  <th className={th}>Category</th>
+                  {trendData.map((q) => (
+                    <th key={q.quarter} className={`${th} text-right ${!yearly && q.quarter === selectedQuarter ? "text-neutral-900 font-medium" : ""}`}>{q.quarter.replace(" 20", " '")}</th>
+                  ))}
+                  <th className={`${th} text-right`}>Change</th>
+                  <th className={`${th} text-right`}>Loss avoided</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {[...categoryCounts].sort((a, b) => b.count - a.count).map((cat) => {
+                  const nowCount = current?.byCategory[cat.key] ?? 0;
+                  const beforeCount = previous?.byCategory[cat.key];
+                  const change = beforeCount ? ((nowCount / (current?.elapsedShare ?? 1) - beforeCount) / beforeCount) * 100 : null;
+                  return (
+                    <tr key={cat.key}>
+                      <td className={`${td} font-medium whitespace-nowrap`}>{cat.label}</td>
+                      {trendData.map((q) => {
+                        const n = q.byCategory[cat.key] ?? 0;
+                        const strength = n / maxCategoryCell;
+                        return (
+                          <td key={q.quarter} className={`${td} text-right tabular-nums`}>
+                            <span
+                              className={`inline-block min-w-9 rounded px-1.5 py-0.5 ${strength > 0.6 ? "text-white" : "text-neutral-800"}`}
+                              style={{ backgroundColor: n === 0 ? "transparent" : `rgba(23,23,23,${(0.06 + strength * 0.8).toFixed(2)})` }}
+                            >
+                              {n === 0 ? <span className="text-neutral-300">0</span> : n}
+                            </span>
+                          </td>
+                        );
+                      })}
+                      <td className={`${td} text-right tabular-nums text-neutral-600 whitespace-nowrap`}>
+                        {change === null ? "—" : Math.abs(change) < 0.5 ? "0%" : `${change > 0 ? "+" : ""}${change.toFixed(0)}%`}
+                      </td>
+                      <td className={`${td} text-right tabular-nums`}>{cat.count > 0 ? fmt(cat.cost) : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="px-3 py-2 border-t border-neutral-200 text-[12px] text-neutral-400">
+            Change compares {current?.quarter} with {previous?.quarter ?? "the previous quarter"}
+            {current?.inProgress ? `, scaling ${current.quarter} to a full quarter because it is still in progress` : ""}. Loss avoided is for {periodLabel}.
+          </p>
         </Panel>
       </div>
 
@@ -323,36 +422,44 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
           </div>
         </Panel>
 
-        <Panel icon={Activity} title="Key risk indicators" subtitle="Derived from this period's alerts">
+        <Panel
+          icon={Activity}
+          title="Key risk indicators"
+          subtitle={current ? `${current.quarter}${previous ? ` against ${previous.quarter}` : ""}` : undefined}
+        >
           <table className="w-full">
             <thead>
               <tr>
                 <th className={th}>Indicator</th>
-                <th className={`${th} text-right`}>Value</th>
+                <th className={`${th} text-right`}>{current?.quarter ?? "Now"}</th>
+                <th className={`${th} text-right`}>{previous?.quarter ?? "Before"}</th>
+                <th className={`${th} text-right`}>{current?.inProgress ? "Change (on pace)" : "Change"}</th>
               </tr>
             </thead>
             <tbody>
-              {kriMetrics.map(kri => (
-                <tr key={kri.label}>
-                  <td className={td}>{kri.label}</td>
-                  <td className={`${td} text-right tabular-nums font-medium ${kri.good ? "" : "text-red-600"}`}>
-                    {typeof kri.value === "number" && kri.unit === "%" ? kri.value.toFixed(1) : kri.value}
-                    <span className="font-normal text-neutral-400">{kri.unit}</span>
-                  </td>
-                </tr>
-              ))}
-              {[
-                { label: "Threat Level", value: severityCounts.Critical > 10 ? "High" : severityCounts.Critical > 3 ? "Medium" : "Low" },
-                { label: "Risk Exposure", value: totalAlerts > 500 ? "Elevated" : totalAlerts > 200 ? "Moderate" : "Controlled" },
-                { label: "Posture", value: costMetrics.controlEffectiveness >= 80 ? "Strong" : costMetrics.controlEffectiveness >= 50 ? "Adequate" : "Needs Review" },
-              ].map(item => (
-                <tr key={item.label}>
-                  <td className={td}>{item.label}</td>
-                  <td className={`${td} text-right`}>
-                    <Tag tone={tone(item.value)}>{item.value}</Tag>
-                  </td>
-                </tr>
-              ))}
+              {indicators.map((k) => {
+                const flat = k.delta === null || Math.abs(k.delta) < 0.5;
+                // Mid-quarter, effectiveness and loss avoided are lower only because fewer incidents have closed yet
+                const judged = k.goodWhen !== "none" && !(current?.inProgress && (k.label === "Control effectiveness" || k.label === "Expected loss avoided"));
+                const better = !flat && judged && (k.goodWhen === "up" ? k.delta! > 0 : k.delta! < 0);
+                const worse = !flat && judged && !better;
+                return (
+                  <tr key={k.label}>
+                    <td className={td}>
+                      {k.label}
+                      <span className="block text-[11px] text-neutral-400">{k.hint}</span>
+                    </td>
+                    <td className={`${td} text-right tabular-nums font-medium`}>{k.now}</td>
+                    <td className={`${td} text-right tabular-nums text-neutral-500`}>{k.before}</td>
+                    <td className={`${td} text-right tabular-nums whitespace-nowrap`}>
+                      {/* colour on a child: the cell's own text colour would otherwise win */}
+                      <span className={better ? "text-green-600" : worse ? "text-red-600" : "text-neutral-500"}>
+                        {k.delta === null ? "—" : flat ? "no change" : `${k.delta > 0 ? "+" : ""}${k.delta.toFixed(k.unit === "pts" ? 1 : 0)}${k.unit === "pts" ? " pts" : "%"}`}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Panel>

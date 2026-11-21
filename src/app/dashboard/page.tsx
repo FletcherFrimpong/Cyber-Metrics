@@ -23,15 +23,6 @@ export default function DashboardPage({ selectedQuarter, timeView }: DashboardPa
     deptCount: data?.departments.length ?? 0,
   };
 
-  const getRiskLabel = () => {
-    if (summary.criticalCount > 5) return { label: "High", tone: "red" as const };
-    if (summary.criticalCount > 0 || summary.totalAlerts > 50) return { label: "Medium", tone: "orange" as const };
-    if (summary.totalAlerts > 0) return { label: "Low", tone: "green" as const };
-    return { label: "No Data", tone: "neutral" as const };
-  };
-
-  const risk = getRiskLabel();
-
   const m = data?.costMetrics;
   const cells = [
     {
@@ -46,19 +37,21 @@ export default function DashboardPage({ selectedQuarter, timeView }: DashboardPa
       note: m ? `${m.revenueBand} revenue${m.profileAssumed ? " (assumed)" : ""}` : "",
     },
     {
-      label: "Cost Impact",
+      label: "Expected loss avoided",
       value: formatCurrency(summary.totalCost),
-      note: "Potential losses prevented",
+      note: m ? `Range ${formatCurrency(m.lossAvoidedLow)} – ${formatCurrency(m.lossAvoidedHigh)}` : "",
     },
     {
-      label: "Risk Level",
-      value: <Tag tone={risk.tone}>{risk.label}</Tag>,
-      note: `${summary.criticalCount} critical of ${summary.totalAlerts.toLocaleString()} incidents`,
+      label: "Critical alerts",
+      value: summary.criticalCount.toLocaleString(),
+      note: summary.totalAlerts > 0
+        ? `${((summary.criticalCount / summary.totalAlerts) * 100).toFixed(1)}% of ${summary.totalAlerts.toLocaleString()} alerts`
+        : "No alerts in this period",
     },
     {
       label: "Top Affected Department",
       value: summary.topDept?.name || "—",
-      note: summary.topDept ? `${summary.topDept.alerts} incidents, ${summary.deptCount} departments` : "Connect a data source to see data",
+      note: summary.topDept ? `${summary.topDept.alerts} alerts, ${summary.deptCount} ${summary.deptCount === 1 ? "department" : "departments"} affected` : "Connect a data source to see data",
     },
   ];
 
@@ -78,7 +71,7 @@ export default function DashboardPage({ selectedQuarter, timeView }: DashboardPa
               <div className={`mt-1 font-semibold tabular-nums text-neutral-900 truncate ${cell.lead ? "text-2xl" : "text-lg"}`}>
                 {cell.value}
               </div>
-              <div className="mt-0.5 text-[12px] text-neutral-400 truncate">{cell.note}</div>
+              <div className="mt-0.5 text-[12px] leading-snug text-neutral-400">{cell.note}</div>
             </div>
           ))}
         </div>

@@ -59,6 +59,25 @@ export interface DashboardMetrics {
   roiHigh: number;
 }
 
+/** One quarter of the four-quarter trend. */
+export interface TrendQuarter {
+  quarter: string;
+  inProgress: boolean;
+  future: boolean;
+  elapsedShare: number;
+  alerts: number;
+  critical: number;
+  high: number;
+  incidentsCounted: number;
+  confirmed: number;
+  dismissed: number;
+  truePositiveRate: number;
+  triageCoverage: number;
+  controlEffectiveness: number;
+  cost: number;
+  byCategory: Record<string, number>;
+}
+
 export interface DashboardData {
   period: "quarterly" | "yearly";
   quarter: string;
@@ -69,7 +88,7 @@ export interface DashboardData {
   severityCounts: Record<"Critical" | "High" | "Medium" | "Low", number>;
   departments: DashboardDepartment[];
   sources: { source: string; alerts: number; incidents: number; lossAvoided: number }[];
-  trend: { quarter: string; alerts: number; cost: number }[];
+  trend: TrendQuarter[];
 }
 
 /** Dashboard figures for a period, computed on the server. */

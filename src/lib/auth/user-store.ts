@@ -35,10 +35,30 @@ function saveToDisk(users: User[]) {
   }
 }
 
+// Every workspace needs an owner. Workspaces created before roles were
+// expanded have only admins and viewers: the longest-standing admin becomes
+// the owner.
+function ensureOwner(users: User[]): User[] {
+  if (users.length === 0 || users.some((u) => u.role === "owner")) return users;
+  const admins = users.filter((u) => u.role === "admin" && u.status === "active");
+  const pick = (admins.length ? admins : users.filter((u) => u.status === "active"))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+  if (pick) {
+    pick.role = "owner";
+    saveToDisk(users);
+    console.log(`[auth] ${pick.username} is now the workspace owner.`);
+  }
+  return users;
+}
+
 // Singleton via globalThis (same pattern as settings-store)
 const g = globalThis as any;
 if (!g.__sfUsers) {
-  g.__sfUsers = loadFromDisk();
+  g.__sfUsers = ensureOwner(loadFromDisk());
+}
+
+export function countOwners(): number {
+  return getUsers().filter((u) => u.role === "owner" && u.status === "active").length;
 }
 
 function getUsers(): User[] {
@@ -157,6 +177,7 @@ export async function createInvite(data: {
   email: string;
   displayName: string;
   role: Role;
+  invitedBy?: string;
 }): Promise<{ user: SafeUser; inviteToken: string }> {
   const existing = getUserByEmail(data.email);
   if (existing) {
@@ -178,6 +199,7 @@ export async function createInvite(data: {
     passwordHash: "", // No password yet — set on accept
     role: data.role,
     status: "pending",
+    invitedBy: data.invitedBy,
     inviteToken: token,
     inviteTokenExpiry: expiry.toISOString(),
     createdAt: now.toISOString(),
@@ -251,7 +273,7 @@ export async function seedDefaultAdmin(): Promise<void> {
     password,
     displayName: "Administrator",
     email: "",
-    role: "admin",
+    role: "owner",
   });
 
   // Write credentials to a file (server-side only, gitignored via .data/)

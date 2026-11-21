@@ -6,8 +6,10 @@ import TrendsAnalytics from "@/components/trends-analytics"
 import { TacticalDashboardLayout } from "@/components/tactical-dashboard-layout"
 import ExecutiveReport from "@/app/executive-reports/page"
 import AlertsBrowser from "@/components/alerts-browser"
+import { useDataStatus, DataStatusBanner, SidebarDataStatus } from "@/components/data-status"
 import SettingsPage from "@/components/settings-page"
-import UserManagement from "@/components/user-management"
+import TeamPage from "@/components/team-page"
+import { ROLE_LABELS } from "@/lib/auth/rbac"
 import ErrorBoundary from "@/components/debug-error-boundary"
 import { useAuth } from "@/components/auth-provider"
 
@@ -16,7 +18,7 @@ type NavItem = {
   id: string
   icon: React.ComponentType<{ className?: string }>
   label: string
-  permission: "dashboard:view" | "reports:view" | "alerts:view" | "settings:view" | "users:manage"
+  permission: "dashboard:view" | "reports:view" | "alerts:view" | "settings:view" | "team:access"
 }
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
@@ -33,7 +35,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     label: "Workspace",
     items: [
       { id: "settings", icon: Settings, label: "Settings", permission: "settings:view" },
-      { id: "user-management", icon: Users, label: "User management", permission: "users:manage" },
+      { id: "user-management", icon: Users, label: "Team", permission: "team:access" },
     ],
   },
 ]
@@ -56,6 +58,15 @@ export default function HomePage() {
   const [selectedQuarter, setSelectedQuarter] = useState<string>(getCurrentQuarter())
   const [lastUpdate, setLastUpdate] = useState<string>("")
   const [refreshKey, setRefreshKey] = useState(0)
+  const [settingsTab, setSettingsTab] = useState<"general" | "integrations" | "email">("general")
+  // Reload the screens by themselves when alerts arrive or the data source changes
+  const [dataStatus, refreshDataStatus] = useDataStatus(() => setRefreshKey((k) => k + 1))
+  // Re-check on every screen change, so a source connected in Settings shows up at once
+  useEffect(() => { refreshDataStatus() }, [activeSection]) // eslint-disable-line react-hooks/exhaustive-deps
+  const openIntegrations = () => {
+    setSettingsTab("integrations")
+    setActiveSection("settings")
+  }
 
   // Update timestamp on mount and when quarter or view changes
   useEffect(() => {
@@ -118,11 +129,11 @@ export default function HomePage() {
     }
 
     if (activeSection === "user-management") {
-      return <UserManagement />
+      return <TeamPage />
     }
 
     if (activeSection === "settings") {
-      return <SettingsPage />
+      return <SettingsPage initialTab={settingsTab} onTabChange={setSettingsTab} />
     }
 
     // Default to trend analytics if no section is selected
@@ -160,7 +171,7 @@ export default function HomePage() {
                       {items.map((item) => (
                         <button
                           key={item.id}
-                          onClick={() => setActiveSection(item.id)}
+                          onClick={() => { if (item.id === "settings") setSettingsTab("general"); setActiveSection(item.id) }}
                           className={`w-full flex items-center gap-2 h-7 px-2 rounded-md text-[13px] transition-colors ${
                             activeSection === item.id
                               ? "bg-neutral-200/70 text-neutral-900 font-medium"
@@ -178,16 +189,13 @@ export default function HomePage() {
             </nav>
 
             <div className="p-2 border-t border-neutral-200">
-              <div className="flex items-center gap-2 px-2 h-7 text-[12px] text-neutral-500">
-                <span className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                System online
-              </div>
+              <SidebarDataStatus status={dataStatus} />
               {user && (
                 <>
                   <div className="flex items-center gap-2 px-2 h-7 text-[13px] text-neutral-800">
                     <User className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
                     <span className="truncate">{user.displayName}</span>
-                    <span className="ml-auto text-[11px] text-neutral-400 capitalize">{user.role}</span>
+                    <span className="ml-auto text-[11px] text-neutral-400">{ROLE_LABELS[user.role]}</span>
                   </div>
                   <button
                     onClick={logout}
@@ -270,8 +278,13 @@ export default function HomePage() {
             </div>
           )}
 
+          {/* What the figures are based on: demo data, a first sync, a failing connection */}
+          {showPeriod && <DataStatusBanner status={dataStatus} onOpenIntegrations={openIntegrations} canConnect={hasPermission("settings:edit")} />}
+
           {/* Screen content */}
-          <div key={refreshKey} className="flex-1 overflow-auto p-3 bg-white">
+          {/* New data re-renders the report screens only. Settings and Team keep
+              their state, so a sync finishing never wipes a half-filled form. */}
+          <div key={showPeriod ? refreshKey : "workspace"} className="flex-1 overflow-auto p-3 bg-white">
             {renderDashboardContent()}
           </div>
         </div>

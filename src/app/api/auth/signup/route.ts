@@ -1,3 +1,5 @@
+import { getTeamPolicy } from "@/lib/settings-store";
+import { audit } from "@/lib/audit-log";
 import { NextRequest, NextResponse } from "next/server";
 import { createUser } from "@/lib/auth/user-store";
 
@@ -40,6 +42,24 @@ export async function POST(request: NextRequest) {
 
   const { username, password, displayName, email } = body;
 
+  // The workspace decides who may sign themselves up.
+  const policy = getTeamPolicy();
+  if (policy.signup === "invite_only") {
+    return NextResponse.json(
+      { error: "This workspace is invitation only. Ask a teammate to invite you." },
+      { status: 403 }
+    );
+  }
+  if (policy.signup === "domain") {
+    const domain = String(email || "").trim().toLowerCase().split("@")[1] || "";
+    if (!domain || !policy.allowedDomains.includes(domain)) {
+      return NextResponse.json(
+        { error: `Sign-up is limited to ${policy.allowedDomains.map((d) => "@" + d).join(", ")} email addresses.` },
+        { status: 403 }
+      );
+    }
+  }
+
   if (!username || !password) {
     return NextResponse.json(
       { error: "Username and password are required" },
@@ -70,6 +90,7 @@ export async function POST(request: NextRequest) {
       role: "viewer", // Self-registration always creates viewers
     });
 
+    audit({ actor: user.username, actorRole: "viewer", action: "user.signup", target: user.username, detail: email ? String(email) : "" });
     return NextResponse.json({ success: true, user });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 409 });

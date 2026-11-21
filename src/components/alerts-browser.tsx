@@ -113,18 +113,23 @@ export default function AlertsBrowser({ timeView, selectedQuarter }: { timeView:
         {data.byIntegration.length === 0 ? (
           <p className="p-3 text-[13px] text-neutral-500">No alerts in this period. Connect a data source under Settings → Integrations.</p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-neutral-200">
+          <div className="grid grid-cols-2 md:grid-cols-4">
             {data.byIntegration.map((s) => (
               <button
                 key={s.name}
                 type="button"
                 onClick={() => setIntegration(integration === s.name ? "all" : s.name)}
-                className={`px-3 py-3 text-left min-w-0 ${integration === s.name ? "bg-neutral-100" : "bg-white hover:bg-neutral-50"}`}
+                className={`px-3 py-3 text-left min-w-0 border-r border-neutral-200 ${integration === s.name ? "bg-neutral-100" : "bg-white hover:bg-neutral-50"}`}
               >
                 <div className="text-[12px] text-neutral-500 truncate">{s.name}</div>
                 <div className="mt-1 text-lg font-semibold tabular-nums text-neutral-900">{s.alerts.toLocaleString()}</div>
               </button>
             ))}
+            {data.usingSampleData && (
+              <p className="col-span-1 md:col-span-3 self-center px-3 py-3 text-[13px] text-neutral-500">
+                Each connected integration gets a tile here with its alert count. Click a tile to filter the list below to that source.
+              </p>
+            )}
           </div>
         )}
       </Panel>

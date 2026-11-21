@@ -1,5 +1,7 @@
 "use client";
 
+import { ROLE_LABELS } from "@/lib/auth/rbac";
+
 import { useState, useEffect, FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -144,7 +146,7 @@ export default function InvitePage() {
     );
   }
 
-  const roleLabel = inviteInfo?.role === "admin" ? "Administrator" : "Viewer";
+  const roleLabel = (ROLE_LABELS as Record<string, string>)[inviteInfo?.role || ""] || "Viewer";
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">

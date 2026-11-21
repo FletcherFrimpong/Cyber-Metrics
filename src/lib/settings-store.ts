@@ -15,6 +15,39 @@ export interface SmtpSettings {
   from: string;
 }
 
+export interface TeamPolicy {
+  /** open: anyone can sign up as a viewer. domain: only listed email domains. invite_only: no sign-up. */
+  signup: "open" | "domain" | "invite_only";
+  allowedDomains: string[];
+  /** Whether analysts and viewers may invite teammates (as viewers). */
+  membersCanInvite: boolean;
+}
+
+// Secure by default: nobody can create their own account until an owner allows it.
+export const DEFAULT_TEAM_POLICY: TeamPolicy = { signup: "invite_only", allowedDomains: [], membersCanInvite: true };
+
+export function getTeamPolicy(): TeamPolicy {
+  return { ...DEFAULT_TEAM_POLICY, ...(getSettings().team || {}) };
+}
+
+export function updateTeamPolicy(partial: Partial<TeamPolicy>): TeamPolicy {
+  const current = getSettings();
+  const next = { ...getTeamPolicy() };
+  if (partial.signup === "open" || partial.signup === "domain" || partial.signup === "invite_only") next.signup = partial.signup;
+  if (Array.isArray(partial.allowedDomains)) {
+    next.allowedDomains = [...new Set(
+      partial.allowedDomains
+        .map((d) => String(d).trim().toLowerCase().replace(/^@/, ""))
+        .filter((d) => /^[a-z0-9.-]+\.[a-z]{2,}$/.test(d))
+    )];
+  }
+  if (typeof partial.membersCanInvite === "boolean") next.membersCanInvite = partial.membersCanInvite;
+  current.team = next;
+  (globalThis as any).__sfSettings = current;
+  saveToDisk(current);
+  return next;
+}
+
 export interface AppSettings {
   investmentAmount: number;
   /** Legacy, always null after load: see migrate(). */
@@ -32,6 +65,8 @@ export interface AppSettings {
     lossEventsLast12Months: number;
     typicalControlEffectiveness: number | null;
   } | null;
+  /** Who may join the workspace and who may invite. */
+  team: TeamPolicy | null;
   /** Per-connector credentials, keyed by connector id. See src/lib/connectors. */
   connectors: Record<string, Record<string, string>>;
 }
@@ -41,6 +76,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   sentinel: null,
   smtp: null,
   organisation: null,
+  team: null,
   connectors: {},
 };
 

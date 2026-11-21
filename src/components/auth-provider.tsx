@@ -9,14 +9,14 @@ import {
   ReactNode,
 } from "react";
 import { useRouter } from "next/navigation";
-import type { Permission } from "@/lib/auth/types";
+import type { Permission, Role } from "@/lib/auth/types";
 
 interface SafeUser {
   id: string;
   username: string;
   displayName: string;
   email: string;
-  role: "admin" | "viewer";
+  role: Role;
   createdAt: string;
   updatedAt: string;
 }

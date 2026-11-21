@@ -1,3 +1,4 @@
+import { audit } from "@/lib/audit-log";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByInviteToken, acceptInvite } from "@/lib/auth/user-store";
 
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const user = await acceptInvite({ token, username, password, displayName });
+    audit({ actor: user.username, actorRole: user.role, action: "user.invite_accepted", target: user.username, detail: user.email });
     return NextResponse.json({ success: true, user });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 400 });

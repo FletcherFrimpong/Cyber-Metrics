@@ -1,3 +1,4 @@
+import { audit } from "@/lib/audit-log";
 import { NextRequest, NextResponse } from "next/server";
 import { getUserByUsername, seedDefaultAdmin } from "@/lib/auth/user-store";
 import { verifyPassword } from "@/lib/auth/password";
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) {
     recordFailure(ip);
+    audit({ actor: "anonymous", action: "auth.login_failed", target: user.username });
     return NextResponse.json(
       { error: "Invalid credentials" },
       { status: 401 }
@@ -95,6 +97,7 @@ export async function POST(request: NextRequest) {
 
   clearFailures(ip);
   await createSession(user);
+  audit({ actor: user.username, actorRole: user.role, action: "auth.login", target: user.username });
 
   // Auto-delete initial credentials file after first admin login
   try {

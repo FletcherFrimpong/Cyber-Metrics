@@ -80,7 +80,7 @@ export function StatStrip({
           <div className={cn("mt-1 font-semibold tabular-nums truncate", stat.lead ? "text-2xl" : "text-lg", stat.negative ? "text-red-600" : "text-neutral-900")}>
             {stat.value}
           </div>
-          {stat.note && <div className="mt-0.5 text-[12px] text-neutral-400 truncate">{stat.note}</div>}
+          {stat.note && <div className="mt-0.5 text-[12px] leading-snug text-neutral-400">{stat.note}</div>}
         </div>
       ))}
     </div>

@@ -63,7 +63,7 @@ export default function FinancialMetrics({ timeView, selectedQuarter }: Financia
             <div className={`mt-1 text-lg font-semibold tabular-nums ${cell.negative ? "text-red-600" : "text-neutral-900"}`}>
               {cell.value}
             </div>
-            <div className="mt-0.5 text-[12px] text-neutral-400 truncate">{cell.note}</div>
+            <div className="mt-0.5 text-[12px] leading-snug text-neutral-400">{cell.note}</div>
           </div>
         ))}
       </div>

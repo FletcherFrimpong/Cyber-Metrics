@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog } from "@/components/ui/dialog";
@@ -125,8 +126,14 @@ function ConnectorForm({ connector, canEdit, onChanged }: { connector: Connector
   const [values, setValues] = useState<Record<string, string>>(connector.values);
   const [busy, setBusy] = useState<"test" | "save" | "sync" | "remove" | null>(null);
   const [result, setResult] = useState<Result>(null);
+  const canSync = useAuth().hasPermission("sentinel:sync");
+  // Disconnecting deletes that source's alerts, so it takes a second click
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
-  useEffect(() => setValues(connector.values), [connector.values]);
+  // Reset the form only when the saved values really change (after a save or a
+  // disconnect), not on every background reload, so typing is never wiped.
+  const savedValues = JSON.stringify(connector.values);
+  useEffect(() => setValues(JSON.parse(savedValues)), [savedValues]);
 
   const missing = connector.fields.some((f) => f.required && !values[f.key]);
 
@@ -166,6 +173,7 @@ function ConnectorForm({ connector, canEdit, onChanged }: { connector: Connector
         <Field key={field.key} label={<>{field.label}{!field.required && <span className="text-neutral-400"> (optional)</span>}</>}>
           {field.type === "select" ? (
             <select
+              aria-label={field.label}
               value={values[field.key] || ""}
               onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
               disabled={!canEdit}
@@ -176,6 +184,7 @@ function ConnectorForm({ connector, canEdit, onChanged }: { connector: Connector
             </select>
           ) : (
             <Input
+              aria-label={field.label}
               type={field.type === "password" ? "password" : "text"}
               placeholder={field.placeholder}
               value={values[field.key] || ""}
@@ -212,14 +221,36 @@ function ConnectorForm({ connector, canEdit, onChanged }: { connector: Connector
                 <Spinner show={busy === "sync"} />
                 Sync now
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => call("remove")} disabled={!!busy} className="h-7 text-xs text-red-600 hover:text-red-700">
-                Disconnect
-              </Button>
+              {confirmRemove ? (
+                <span className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[12px] text-red-700">
+                  Remove its {status?.totalAlerts ?? 0} alerts and disconnect?
+                  <Button size="sm" onClick={() => { setConfirmRemove(false); call("remove"); }} disabled={!!busy} className="h-6 bg-red-600 hover:bg-red-700 text-white text-xs">
+                    Yes, disconnect
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setConfirmRemove(false)} className="h-6 text-xs">
+                    Cancel
+                  </Button>
+                </span>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => setConfirmRemove(true)} disabled={!!busy} className="h-7 text-xs text-red-600 hover:text-red-700">
+                  <Spinner show={busy === "remove"} />
+                  Disconnect
+                </Button>
+              )}
             </>
           )}
         </div>
       ) : (
-        <p className="text-[12px] text-neutral-400">Only administrators can change integrations.</p>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Analysts and managers cannot change an integration, but they can ask it to pull now */}
+          {canSync && connector.configured && (
+            <Button variant="outline" size="sm" onClick={() => call("sync")} disabled={!!busy} className="h-7 text-xs shadow-none">
+              <Spinner show={busy === "sync"} />
+              Sync now
+            </Button>
+          )}
+          <p className="text-[12px] text-neutral-400">Only administrators can change integrations.</p>
+        </div>
       )}
       <ResultLine result={result} />
     </div>
@@ -342,7 +373,7 @@ export default function Integrations({ canEdit }: { canEdit: boolean }) {
         description={open?.description}
         header={open ? <Logo id={open.id} name={open.name} className="h-7 w-16 mt-0.5" /> : undefined}
       >
-        {open && <ConnectorForm connector={open} canEdit={canEdit} onChanged={load} />}
+        {open && <ConnectorForm key={open.id} connector={open} canEdit={canEdit} onChanged={load} />}
       </Dialog>
     </div>
   );

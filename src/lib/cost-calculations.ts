@@ -20,6 +20,12 @@ export interface CostCalculationParams {
   period: "quarterly" | "yearly" | "monthly";
   selectedQuarter?: string;
   investmentAmount?: number; // User-configured ANNUAL security investment
+  /** Use these organisation settings instead of the saved ones (for previewing a change). */
+  profileOverride?: {
+    revenueBand?: string | null;
+    lossEventsLast12Months?: number;
+    typicalControlEffectiveness?: number | null;
+  };
 }
 
 export interface CategoryLossAvoided {
@@ -403,8 +409,8 @@ interface Profile {
   typicalControlEffectiveness: number;
 }
 
-function getProfile(): Profile {
-  const org = getSettings().organisation;
+function getProfile(override?: CostCalculationParams["profileOverride"]): Profile {
+  const org = override ?? getSettings().organisation;
   const band = getRevenueBand(org?.revenueBand);
   const typical = Number(org?.typicalControlEffectiveness);
   return {
@@ -426,7 +432,7 @@ function getProfile(): Profile {
 
 export const calculateRiskSummary = (params: CostCalculationParams): RiskSummary => {
   const { period, selectedQuarter = currentQuarterLabel() } = params;
-  const profile = getProfile();
+  const profile = getProfile(params.profileOverride);
   const periodYears = PERIOD_SHARE[period];
   return summariseRisk(getAlertsForPeriod(period, selectedQuarter), isKnownTechnique, {
     anchor: profile.band,
@@ -439,7 +445,7 @@ export const calculateRiskSummary = (params: CostCalculationParams): RiskSummary
 export const calculateCostMetrics = async (params: CostCalculationParams): Promise<CostMetrics> => {
   const { period, investmentAmount = 0 } = params;
   const risk = calculateRiskSummary(params);
-  const profile = getProfile();
+  const profile = getProfile(params.profileOverride);
   const pct = (x: number) => Math.round(x * 1000) / 10;
 
   const totalInvestment = Math.round(investmentAmount * PERIOD_SHARE[period]);

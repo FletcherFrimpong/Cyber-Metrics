@@ -1,3 +1,4 @@
+import { audit } from "@/lib/audit-log";
 import { NextRequest, NextResponse } from "next/server";
 import { getSettings, updateSettings } from "@/lib/settings-store";
 import { requireAuth, isAuthError } from "@/lib/auth/api-guard";
@@ -42,5 +43,7 @@ export async function POST(request: NextRequest) {
     smtp: body.smtp,
   });
 
+  const changed = ["investmentAmount", "organisation", "smtp"].filter((k) => body?.[k] !== undefined);
+  audit({ actor: auth.username, actorRole: auth.role, action: "settings.update", target: changed.join(", ") || "settings" });
   return NextResponse.json({ success: true, settings: { investmentAmount: s.investmentAmount } });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, isAuthError } from "@/lib/auth/api-guard";
 import { calculateCostMetrics, calculateRiskSummary } from "@/lib/cost-calculations";
+import { verdictFor } from "@/lib/risk-model";
 import edrDataService from "@/lib/edr-data-service";
 import { getSettings } from "@/lib/settings-store";
 import { startSavedConnectors } from "@/lib/connectors/runtime";
@@ -15,6 +16,14 @@ function quartersOf(period: "quarterly" | "yearly", quarter: string): string[] {
   if (period === "quarterly") return [quarter];
   const year = quarter.split(" ")[1];
   return [1, 2, 3, 4].map((q) => `Q${q} ${year}`);
+}
+
+/** Share of the current calendar quarter that has passed, never below 5%. */
+function elapsedShareOfQuarter(now: Date): number {
+  const q = Math.floor(now.getUTCMonth() / 3);
+  const start = Date.UTC(now.getUTCFullYear(), q * 3, 1);
+  const end = Date.UTC(now.getUTCFullYear(), q * 3 + 3, 1);
+  return Math.min(1, Math.max(0.05, (now.getTime() - start) / (end - start)));
 }
 
 /** The selected quarter and the three before it. */
@@ -102,13 +111,38 @@ export async function GET(request: NextRequest) {
       .map((r) => ({ ...r, lossAvoided: Math.round(r.lossAvoided) }))
       .sort((a, b) => b.lossAvoided - a.lossAvoided || b.alerts - a.alerts);
 
-    // Loss avoided and alert volume for the last four quarters
-    const trend = trailingQuarters(quarter).map((q) => {
+    // The last four quarters, side by side: volume, what analysts made of it,
+    // and what the model makes of that. Feeds every trend view.
+    const thisQuarter = `Q${Math.floor(now.getUTCMonth() / 3) + 1} ${now.getUTCFullYear()}`;
+    // A quarterly view shows the selected quarter and the three before it;
+    // a yearly view shows that year's four quarters.
+    const order = (q: string) => { const m = q.match(/Q(\d)\s+(\d{4})/); return m ? parseInt(m[2], 10) * 4 + parseInt(m[1], 10) : 0; };
+    const trendQuarters = period === "yearly" ? quartersOf("yearly", quarter) : trailingQuarters(quarter);
+    const trend = trendQuarters.map((q) => {
       const data = edrDataService.getTimeframeAlerts(q);
+      const alerts = BUCKETS.flatMap((b) => data[b]);
+      const r = calculateRiskSummary({ period: "quarterly", selectedQuarter: q });
+      const triaged = alerts.filter((a) => verdictFor(a) !== "unverified").length;
+      const share = (n: number) => (alerts.length > 0 ? Math.round((n / alerts.length) * 1000) / 10 : 0);
       return {
         quarter: q,
-        alerts: BUCKETS.reduce((sum, b) => sum + data[b].length, 0),
-        cost: Math.round(calculateRiskSummary({ period: "quarterly", selectedQuarter: q }).lossAvoided.mean),
+        /** The quarter has not finished, so its counts are still growing. */
+        inProgress: q === thisQuarter,
+        /** The quarter has not started yet. */
+        future: order(q) > order(thisQuarter),
+        /** How much of the quarter has passed (1 once it is over), for like-for-like comparisons. */
+        elapsedShare: q === thisQuarter ? elapsedShareOfQuarter(now) : 1,
+        alerts: alerts.length,
+        critical: alerts.filter((a) => a.severity === "Critical").length,
+        high: alerts.filter((a) => a.severity === "High").length,
+        incidentsCounted: r.confirmedIncidents + r.unverifiedIncidents,
+        confirmed: r.confirmedIncidents,
+        dismissed: r.dismissedIncidents,
+        truePositiveRate: share(r.countedAlerts),
+        triageCoverage: share(triaged),
+        controlEffectiveness: Math.round(r.controlEffectiveness.mean * 1000) / 10,
+        cost: Math.round(r.lossAvoided.mean),
+        byCategory: Object.fromEntries(BUCKETS.map((b) => [b, data[b].length])),
       };
     });
 

@@ -54,39 +54,42 @@ export const generateTrendsAnalyticsPDF = async (data: TrendsAnalyticsData): Pro
     throw new Error('PDF export is only available in browser environment');
   }
 
-  try {
-    // Create a new window for PDF generation
-    const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes,location=no,menubar=no,toolbar=no');
-    if (!printWindow) {
-      throw new Error('Failed to open print window. Please allow pop-ups for this site.');
-    }
+  // Print from a hidden frame rather than a pop-up window: pop-ups are often
+  // blocked, and some browsers open them over the app itself.
+  const content = generateBeautifulPDFContent(data);
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.title = 'Report for printing';
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(frame);
 
-    // Generate the beautiful content for the PDF
-    const content = generateBeautifulPDFContent(data);
-    
-    // Write content to the new window
-    printWindow.document.write(content);
-    printWindow.document.close();
-    
-    // Wait for content to load
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Check if the window is still open
-    if (printWindow.closed) {
-      throw new Error('Print window was closed before PDF generation');
-    }
-    
-    // Print to PDF (this will show the print dialog)
-    printWindow.print();
-    
-    // Close the window after printing
-    setTimeout(() => {
-      if (!printWindow.closed) {
-        printWindow.close();
-      }
-    }, 1000);
-    
+  try {
+    const doc = frame.contentDocument;
+    const win = frame.contentWindow;
+    if (!doc || !win) throw new Error('Could not prepare the report for printing');
+
+    doc.open();
+    doc.write(content);
+    doc.close();
+
+    // Let the frame lay out before printing
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // The saved PDF takes its file name from the page title while printing
+    const appTitle = document.title;
+    const restore = () => {
+      document.title = appTitle;
+      setTimeout(() => frame.remove(), 500);
+    };
+    if (doc.title) document.title = doc.title;
+    win.addEventListener('afterprint', restore, { once: true });
+    // Some browsers never fire afterprint; tidy up regardless
+    setTimeout(restore, 60000);
+
+    win.focus();
+    win.print();
   } catch (error) {
+    frame.remove();
     console.error('PDF generation failed:', error);
     throw error;
   }

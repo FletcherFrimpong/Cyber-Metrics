@@ -17,18 +17,23 @@ export default function BusinessUnits({ selectedQuarter, timeView = "quarterly" 
   // Take top 5
   const topDepartments = departments.slice(0, 5);
 
+  // How serious a department's alerts are, against the organisation as a whole:
+  // the share rated critical or high, compared with the average across departments.
+  const seriousShare = (d: { alerts: number; critical: number; high: number }) => (d.alerts > 0 ? (d.critical + d.high) / d.alerts : 0);
+  const totals = departments.reduce((t, d) => ({ alerts: t.alerts + d.alerts, critical: t.critical + d.critical, high: t.high + d.high }), { alerts: 0, critical: 0, high: 0 });
+  const average = seriousShare(totals);
   const getRiskLevel = (dept: typeof topDepartments[0]) => {
-    if (dept.critical > 0) return { label: "Critical", tone: "red" as const };
-    if (dept.high > 0) return { label: "High", tone: "orange" as const };
-    if (dept.alerts > 10) return { label: "Medium", tone: "yellow" as const };
-    return { label: "Low", tone: "green" as const };
+    const diff = seriousShare(dept) - average;
+    if (diff > 0.05) return { label: "Above average", tone: "red" as const };
+    if (diff < -0.05) return { label: "Below average", tone: "green" as const };
+    return { label: "Average", tone: "neutral" as const };
   };
 
   return (
     <Panel
       icon={Target}
       title="Top Affected Departments"
-      subtitle="Ranked by expected loss avoided, sourced from Azure AD user profiles"
+      subtitle="Ranked by expected loss avoided; the department is the one the affected user belongs to"
     >
       {topDepartments.length === 0 ? (
         <p className="p-3 text-[13px] text-neutral-500">
@@ -45,7 +50,7 @@ export default function BusinessUnits({ selectedQuarter, timeView = "quarterly" 
               <th className={`${th} text-right`}>Critical</th>
               <th className={`${th} text-right`}>High</th>
               <th className={`${th} text-right`}>Loss avoided</th>
-              <th className={`${th} text-right`}>Risk</th>
+              <th className={`${th} text-right`}>Critical + high share</th>
             </tr>
           </thead>
           <tbody>
@@ -59,7 +64,7 @@ export default function BusinessUnits({ selectedQuarter, timeView = "quarterly" 
                   <td className={`${td} text-right tabular-nums ${dept.critical > 0 ? "text-red-600" : "text-neutral-300"}`}>{dept.critical}</td>
                   <td className={`${td} text-right tabular-nums ${dept.high > 0 ? "" : "text-neutral-300"}`}>{dept.high}</td>
                   <td className={`${td} text-right tabular-nums`}>{formatCurrency(dept.costImpact)}</td>
-                  <td className={`${td} text-right`}><Tag tone={risk.tone}>{risk.label}</Tag></td>
+                  <td className={`${td} text-right whitespace-nowrap`}><span className="mr-2 tabular-nums text-neutral-600">{(seriousShare(dept) * 100).toFixed(0)}%</span><Tag tone={risk.tone}>{risk.label}</Tag></td>
                 </tr>
               );
             })}

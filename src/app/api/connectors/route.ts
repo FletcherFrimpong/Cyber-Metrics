@@ -1,3 +1,4 @@
+import { audit } from "@/lib/audit-log";
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, isAuthError } from "@/lib/auth/api-guard";
 import { getSettings, updateConnector } from "@/lib/settings-store";
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
     manager.forget(def.id);
     edrDataService.removeBySourcePrefix(def.idPrefix);
     if (!CONNECTORS.some((c) => manager.isRunning(c.id))) edrDataService.restoreSampleData();
+    audit({ actor: auth.username, actorRole: auth.role, action: "integration.disconnect", target: def.name });
     return NextResponse.json({ success: true, configured: false });
   }
   if (!body.config || typeof body.config !== "object") {
@@ -72,5 +74,6 @@ export async function POST(request: NextRequest) {
 
   edrDataService.useRealData();
   manager.start(def, config);
+  audit({ actor: auth.username, actorRole: auth.role, action: "integration.connect", target: def.name });
   return NextResponse.json({ success: true, configured: true });
 }

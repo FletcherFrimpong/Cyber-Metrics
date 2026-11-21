@@ -1,3 +1,4 @@
+import { ROLE_LABELS } from "./auth/rbac";
 import nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
 
@@ -32,7 +33,7 @@ export async function sendInviteEmail(params: {
   if (!isEmailConfigured()) return;
 
   const { to, displayName, role, inviteUrl } = params;
-  const roleLabel = role === "admin" ? "Administrator" : "Viewer";
+  const roleLabel = (ROLE_LABELS as Record<string, string>)[role] || role;
   const transporter = getTransporter();
 
   await transporter.sendMail({

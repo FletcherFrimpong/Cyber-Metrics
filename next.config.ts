@@ -37,6 +37,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // The floating dev badge sits on top of the sidebar's sign-out button
+  devIndicators: false,
   turbopack: {
     root: process.cwd(),
   },

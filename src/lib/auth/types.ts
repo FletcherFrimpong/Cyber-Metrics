@@ -1,4 +1,4 @@
-export type Role = "admin" | "viewer";
+export type Role = "owner" | "admin" | "manager" | "analyst" | "viewer";
 export type UserStatus = "active" | "pending";
 
 export interface User {
@@ -11,6 +11,8 @@ export interface User {
   status: UserStatus;
   inviteToken?: string;
   inviteTokenExpiry?: string;
+  /** User id of whoever invited this person; absent for sign-ups and the first owner. */
+  invitedBy?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -33,6 +35,9 @@ export type Permission =
   | "alerts:view"
   | "settings:view"
   | "settings:edit"
-  | "users:manage"
+  | "users:view"      // see the whole team
+  | "users:manage"    // change roles, remove people, set the access policy
+  | "team:access"     // may open the Team screen (granted to anyone who can view or invite)
+  | "audit:view"
   | "sentinel:configure"
   | "sentinel:sync";

@@ -89,10 +89,10 @@ class EDRDataService {
     if (this.sampleDataLoaded) return;
 
     try {
-      // Dynamic import to avoid bundling sample data when not needed
-      const { generateTimeframeAlerts } = require("@/data/azure-sentinel-samples");
+      // Loaded on demand so demo data stays out of the way once real data exists
+      const { generateDemoAlerts } = require("@/data/demo-alerts");
 
-      // Generate sample alerts for the current and previous 3 quarters
+      // Demo alerts for the current and previous three quarters
       const now = new Date();
       const currentQ = Math.floor(now.getMonth() / 3) + 1;
       const currentY = now.getFullYear();
@@ -102,20 +102,10 @@ class EDRDataService {
         let y = currentY;
         if (q <= 0) { q += 4; y -= 1; }
 
-        const timeframe = `Q${q} ${y}`;
-        const alerts = generateTimeframeAlerts(timeframe);
-
-        // Distribute sample alerts across categories
-        for (const alert of alerts) {
-          let category: AlertCategory = "edr"; // default
-          const cat = (alert.category || "").toLowerCase();
-          if (cat.includes("phish") || cat.includes("email") || cat.includes("spam")) category = "email";
-          else if (cat.includes("network") || cat.includes("firewall") || cat.includes("lateral")) category = "network";
-          else if (cat.includes("web") || cat.includes("waf") || cat.includes("injection")) category = "web";
-          else if (cat.includes("cloud") || cat.includes("azure") || cat.includes("aws")) category = "cloud";
-          else if (cat.includes("credential") || cat.includes("identity") || cat.includes("account")) category = "identity";
-
-          this.sentinelAlerts[category].push(alert as SecurityAlert);
+        for (const { alert, category } of generateDemoAlerts(`Q${q} ${y}`)) {
+          // Nothing dated in the future: the current quarter is only part-way through
+          if (new Date(alert.timestamp) > now) continue;
+          this.sentinelAlerts[category as AlertCategory].push(alert as SecurityAlert);
         }
       }
 

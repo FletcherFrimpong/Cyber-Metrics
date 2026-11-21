@@ -4,29 +4,29 @@ import { useState, useEffect } from "react";
 import { Panel, Tag, Field } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DollarSign, Building2, Loader2, Mail, Plug, SlidersHorizontal } from "lucide-react";
+import { Loader2, Mail, Plug, SlidersHorizontal } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import Integrations from "@/components/integrations";
+import GeneralSettings from "@/components/settings-general";
 
 type TabId = "general" | "integrations" | "email";
 
 const TABS: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }>; description: string }[] = [
-  { id: "general", label: "General", icon: SlidersHorizontal, description: "Your organisation and security spend. These drive every dollar figure on the dashboard." },
+  { id: "general", label: "General", icon: SlidersHorizontal, description: "Your organisation and security spend. Every dollar figure on the dashboard is calculated from these; the panel beside them shows the effect of each change." },
   { id: "integrations", label: "Integrations", icon: Plug, description: "Where alerts come from. Click a card to set it up or manage it." },
   { id: "email", label: "Email", icon: Mail, description: "Outgoing mail for user invitations." },
 ];
 
 const inputClass = "h-8 bg-white border-neutral-200 text-[13px] text-neutral-900 shadow-none";
 
-export default function SettingsPage() {
+export default function SettingsPage({ initialTab = "general", onTabChange }: { initialTab?: TabId; onTabChange?: (tab: TabId) => void }) {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission("settings:edit");
-  const [tab, setTab] = useState<TabId>("general");
+  const [tab, setTabState] = useState<TabId>(initialTab);
+  // The shell remembers the tab, so links such as "Connect a data source" can open one directly
+  const setTab = (next: TabId) => { setTabState(next); onTabChange?.(next); };
+  useEffect(() => { setTabState(initialTab); }, [initialTab]);
 
-  const [investmentAmount, setInvestmentAmount] = useState("");
-  const [org, setOrg] = useState({ revenueBand: "", lossEvents: "0", typicalPct: "" });
-  const [revenueBands, setRevenueBands] = useState<{ id: string; label: string }[]>([]);
-  const [defaultTypicalPct, setDefaultTypicalPct] = useState(40);
   const [smtp, setSmtp] = useState({ host: "", port: "587", user: "", pass: "", from: "" });
   const [smtpConfigured, setSmtpConfigured] = useState(false);
 
@@ -41,16 +41,6 @@ export default function SettingsPage() {
         const res = await fetch("/api/settings");
         const settings = await res.json();
 
-        setInvestmentAmount(settings.investmentAmount ? String(settings.investmentAmount) : "");
-        setRevenueBands(settings.revenueBands || []);
-        setDefaultTypicalPct(Math.round((settings.defaultTypicalControlEffectiveness ?? 0.4) * 100));
-        setOrg({
-          revenueBand: settings.organisation?.revenueBand || "",
-          lossEvents: String(settings.organisation?.lossEventsLast12Months ?? 0),
-          typicalPct: settings.organisation?.typicalControlEffectiveness
-            ? String(Math.round(settings.organisation.typicalControlEffectiveness * 100))
-            : "",
-        });
         if (settings.smtp) {
           setSmtp({
             host: settings.smtp.host || "",
@@ -92,16 +82,6 @@ export default function SettingsPage() {
     }
   };
 
-  const saveGeneral = () =>
-    save({
-      investmentAmount: parseFloat(investmentAmount) || 0,
-      organisation: {
-        revenueBand: org.revenueBand || null,
-        lossEventsLast12Months: parseInt(org.lossEvents, 10) || 0,
-        typicalControlEffectiveness: org.typicalPct ? parseFloat(org.typicalPct) / 100 : null,
-      },
-    });
-
   const saveEmail = () =>
     save({
       smtp: smtp.host
@@ -132,7 +112,7 @@ export default function SettingsPage() {
     );
 
   return (
-    <div className={`w-full pb-6 ${tab === "integrations" ? "max-w-6xl" : "max-w-3xl"}`}>
+    <div className={`w-full pb-6 ${tab === "email" ? "max-w-3xl" : "max-w-6xl"}`}>
       {/* Section tabs */}
       <div role="tablist" aria-label="Settings sections" className="inline-flex items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5">
         {TABS.map((t) => (
@@ -152,96 +132,7 @@ export default function SettingsPage() {
       </div>
       <p className="mt-2 mb-4 text-[13px] text-neutral-500">{active.description}</p>
 
-      {tab === "general" && (
-        <div className="space-y-3">
-          {/* Organisation profile: what the dollar figures are anchored to */}
-          <Panel icon={Building2} title="Organisation profile" subtitle="Anchors the dollar figures to published loss data">
-            <div className="p-3 space-y-3">
-              <p className="text-[13px] text-neutral-500">
-                Loss avoided is capped by what organisations of your size are known to lose (Cyentia Institute, Information Risk
-                Insights Study). Until you choose a size, $100M – $1B is assumed.
-              </p>
-              <Field label="Annual revenue">
-                <select
-                  value={org.revenueBand}
-                  onChange={(e) => setOrg((o) => ({ ...o, revenueBand: e.target.value }))}
-                  disabled={!canEdit}
-                  className="h-8 w-full max-w-xs rounded-md border border-neutral-200 bg-white px-2 text-[13px] text-neutral-900"
-                >
-                  <option value="">Not set</option>
-                  {revenueBands.map((b) => (
-                    <option key={b.id} value={b.id}>{b.label}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Material loss events, last 12 months">
-                <Input
-                  type="number"
-                  min={0}
-                  value={org.lossEvents}
-                  onChange={(e) => setOrg((o) => ({ ...o, lossEvents: e.target.value }))}
-                  disabled={!canEdit}
-                  className={`w-24 ${inputClass}`}
-                />
-                <p className="mt-1 text-[12px] text-neutral-400">
-                  Incidents that got through and caused a real loss. Each one lowers your measured control effectiveness.
-                </p>
-              </Field>
-              <Field label={<>Typical control effectiveness <span className="text-neutral-400">(optional)</span></>}>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={20}
-                    max={80}
-                    placeholder={String(defaultTypicalPct)}
-                    value={org.typicalPct}
-                    onChange={(e) => setOrg((o) => ({ ...o, typicalPct: e.target.value }))}
-                    disabled={!canEdit}
-                    className={`w-24 ${inputClass}`}
-                  />
-                  <span className="text-[13px] text-neutral-500">%</span>
-                </div>
-                <p className="mt-1 text-[12px] text-neutral-400">
-                  Share of serious attacks a typical organisation stops before a material loss. Default {defaultTypicalPct}%, allowed 20–80.
-                  This is the model&apos;s most influential assumption and its evidence is thin: a higher value raises every dollar figure.
-                </p>
-              </Field>
-            </div>
-          </Panel>
-
-          {/* Investment Amount */}
-          <Panel icon={DollarSign} title="Security Investment" subtitle="Used for net benefit and ROI">
-            <div className="p-3 space-y-3">
-              <p className="text-[13px] text-neutral-500">
-                Enter your total annual security investment (EDR licensing, SOC operations, tooling).
-              </p>
-              <Field label="Annual investment">
-                <div className="flex items-center gap-3">
-                  <div className="relative w-48">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500 text-[13px]">$</span>
-                    <Input
-                      type="number"
-                      placeholder="e.g. 700000"
-                      value={investmentAmount}
-                      onChange={(e) => setInvestmentAmount(e.target.value)}
-                      disabled={!canEdit}
-                      className={`pl-7 ${inputClass}`}
-                    />
-                  </div>
-                  <span className="text-[13px] text-neutral-500">per year</span>
-                </div>
-                {investmentAmount && parseFloat(investmentAmount) > 0 && (
-                  <p className="mt-1 text-[12px] text-neutral-400">
-                    = ${(parseFloat(investmentAmount) / 1000).toFixed(0)}K/year, ${(parseFloat(investmentAmount) / 4 / 1000).toFixed(0)}K/quarter
-                  </p>
-                )}
-              </Field>
-            </div>
-          </Panel>
-
-          <SaveBar onSave={saveGeneral} />
-        </div>
-      )}
+      {tab === "general" && <GeneralSettings canEdit={canEdit} />}
 
       {tab === "integrations" && <Integrations canEdit={canEdit} />}
 

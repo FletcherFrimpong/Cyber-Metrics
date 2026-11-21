@@ -1,8 +1,15 @@
+import { getTeamPolicy } from "@/lib/settings-store";
 import { NextRequest, NextResponse } from "next/server";
 import { hasAnyUsers, createUser } from "@/lib/auth/user-store";
 
 export async function GET() {
-  return NextResponse.json({ needsSetup: !hasAnyUsers() });
+  const policy = getTeamPolicy();
+  return NextResponse.json({
+    needsSetup: !hasAnyUsers(),
+    // lets the login page hide or explain sign-up
+    signup: policy.signup,
+    allowedDomains: policy.signup === "domain" ? policy.allowedDomains : [],
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -44,7 +51,7 @@ export async function POST(request: NextRequest) {
     password,
     displayName: displayName || username,
     email: email || "",
-    role: "admin",
+    role: "owner",
   });
 
   return NextResponse.json({ success: true, user });

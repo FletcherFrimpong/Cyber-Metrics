@@ -14,6 +14,8 @@ export default function LoginPage() {
   const { refresh } = useAuth();
   const [mode, setMode] = useState<Mode>("login");
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [signupPolicy, setSignupPolicy] = useState<"open" | "domain" | "invite_only">("open");
+  const [allowedDomains, setAllowedDomains] = useState<string[]>([]);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -28,6 +30,8 @@ export default function LoginPage() {
       .then((r) => r.json())
       .then((data) => {
         setNeedsSetup(data.needsSetup);
+        setSignupPolicy(data.signup || "open");
+        setAllowedDomains(data.allowedDomains || []);
         if (data.needsSetup) setMode("setup");
       })
       .catch(() => setNeedsSetup(false));
@@ -165,15 +169,17 @@ export default function LoginPage() {
   const isLogin = mode === "login";
 
   const heading = isSetup
-    ? "Create Admin Account"
+    ? "Create Owner Account"
     : isSignup
     ? "Create Account"
     : "Sign In";
 
   const subtitle = isSetup
-    ? "Set up your first administrator account to get started."
+    ? "Set up the first account. It becomes the workspace owner."
     : isSignup
-    ? "Create a new viewer account to access the dashboard."
+    ? signupPolicy === "domain"
+      ? `Sign up with your ${allowedDomains.map((d) => "@" + d).join(" or ")} email. You join as a viewer.`
+      : "Create a viewer account. An administrator can change your role later."
     : "Enter your credentials to access the dashboard.";
 
   const onSubmit = isSetup ? handleSetup : isSignup ? handleSignup : handleLogin;
@@ -195,7 +201,12 @@ export default function LoginPage() {
         </div>
 
         {/* Tab switcher — hidden during first-run setup */}
-        {!isSetup && (
+        {!isSetup && signupPolicy === "invite_only" && (
+          <p className="mb-6 text-center text-[13px] text-neutral-500">
+            This workspace is invitation only. Ask a teammate for an invite link.
+          </p>
+        )}
+        {!isSetup && signupPolicy !== "invite_only" && (
           <div className="flex mb-6 bg-white border border-neutral-200 rounded-lg p-1">
             <button
               onClick={() => switchMode("login")}
