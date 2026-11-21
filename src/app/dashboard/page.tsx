@@ -32,27 +32,33 @@ export default function DashboardPage({ selectedQuarter, timeView }: DashboardPa
 
   const risk = getRiskLabel();
 
+  const m = data?.costMetrics;
   const cells = [
+    {
+      label: "Chance of a material loss this year",
+      value: m ? `${m.lossProbabilityWithControls}%` : "—",
+      note: m ? `Down from ${m.lossProbabilityWithoutControls}% without detection and response` : "",
+      lead: true,
+    },
+    {
+      label: "Severe event at your size",
+      value: m ? formatCurrency(m.severeLoss) : "—",
+      note: m ? `${m.revenueBand} revenue${m.profileAssumed ? " (assumed)" : ""}` : "",
+    },
     {
       label: "Cost Impact",
       value: formatCurrency(summary.totalCost),
       note: "Potential losses prevented",
-      lead: true,
     },
     {
       label: "Risk Level",
       value: <Tag tone={risk.tone}>{risk.label}</Tag>,
-      note: `${summary.criticalCount} critical incidents`,
-    },
-    {
-      label: "Total Incidents",
-      value: summary.totalAlerts.toLocaleString(),
-      note: `Across ${summary.deptCount} departments`,
+      note: `${summary.criticalCount} critical of ${summary.totalAlerts.toLocaleString()} incidents`,
     },
     {
       label: "Top Affected Department",
       value: summary.topDept?.name || "—",
-      note: summary.topDept ? `${summary.topDept.alerts} incidents` : "Connect Sentinel to see data",
+      note: summary.topDept ? `${summary.topDept.alerts} incidents, ${summary.deptCount} departments` : "Connect Sentinel to see data",
     },
   ];
 
@@ -65,7 +71,7 @@ export default function DashboardPage({ selectedQuarter, timeView }: DashboardPa
         subtitle={timeView === "quarterly" ? selectedQuarter : "Yearly Analysis"}
         action={data?.usingSampleData ? <Tag tone="yellow">Demo data</Tag> : undefined}
       >
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-neutral-200">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-px bg-neutral-200">
           {cells.map((cell) => (
             <div key={cell.label} className="px-3 py-3 min-w-0 bg-white">
               <div className="text-[12px] text-neutral-500">{cell.label}</div>

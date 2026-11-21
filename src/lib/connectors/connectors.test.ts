@@ -290,10 +290,14 @@ test("alerts from all three connectors flow through the risk model", () => {
     mapSplunkNotable(notable),
     mapSplunkNotable({ ...notable, event_id: "fp", disposition: "disposition:3", disposition_label: "False Positive - Incorrect Analytic Logic" }),
   ].map((a) => ({ alert: a.alert, bucket: a.category }));
-  const s = summariseRisk(alerts, (id) => /^T\d{4}/.test(id));
+  const s = summariseRisk(alerts, (id) => /^T\d{4}/.test(id), {
+    anchor: { annualEventProbability: 0.05, lossMedian: 500_000, lossP95: 12_000_000 },
+    periodYears: 0.25,
+  });
   assert.equal(s.incidentCount, 4);
   assert.equal(s.confirmedIncidents, 3);
   assert.equal(s.dismissedIncidents, 1);
-  // CrowdStrike: lateral movement 0.45 x 750K; SentinelOne: credential access 0.3 x 200K; Splunk: impact 0.75 x 750K
-  assert.equal(s.lossAvoided.mean, 0.45 * 750000 + 0.3 * 200000 + 0.75 * 750000);
+  // Seriousness weights: CrowdStrike lateral movement 0.45, SentinelOne credential access 0.3, Splunk impact 0.75
+  assert.ok(Math.abs(s.seriousnessWeight - (0.45 + 0.3 + 0.75)) < 1e-9);
+  assert.ok(s.lossAvoided.mean > 0 && s.lossAvoided.mean <= s.exposure);
 });

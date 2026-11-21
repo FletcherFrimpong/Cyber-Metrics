@@ -4,9 +4,12 @@ import {
   summariseRisk,
   verdictFor,
   unverifiedProbability,
+  DEFAULT_RISK_CONFIG,
   type ModelAlert,
   type RiskSummary,
 } from "./risk-model";
+import { getRevenueBand, DEFAULT_REVENUE_BAND, type RevenueBand } from "./anchor-data.ts";
+import { getSettings } from "./settings-store";
 
 // Centralized cost calculation system.
 // Flow: alerts (Sentinel or sample) → incidents → risk model → dashboard metrics.
@@ -34,11 +37,25 @@ export interface CostMetrics {
   unverifiedIncidents: number;   // No analyst verdict; passed the gate, weighted by confidence
   dismissedIncidents: number;
   confirmedShare: number;        // % of loss avoided resting on analyst-confirmed incidents
-  grossExposure: number;         // Undiscounted benchmark sum — upper bound, not an estimate
+  exposure: number;               // Expected loss for the period with no detection and response
+  controlEffectiveness: number;   // % of that exposure your controls removed
+  controlEffectivenessLow: number;
+  controlEffectivenessHigh: number;
+  residualLoss: number;           // Expected loss still carried in the period
+  lossProbabilityWithoutControls: number; // % chance of a material loss in a year, no detection and response
+  lossProbabilityWithControls: number;    // % chance with your controls
+  peerAnnualLoss: number;         // What a peer organisation loses per year (published data)
+  typicalLoss: number;            // Published median loss per event for this size
+  severeLoss: number;             // Published 95th percentile loss per event
+  lossPerEvent: number;           // Expected loss per event used in the model
+  revenueBand: string;            // Label of the size band the figures are anchored to
+  profileAssumed: boolean;        // true until the organisation's size is set in Settings
+  typicalControlEffectiveness: number; // % assumed for a typical organisation
+  lossEventsSuffered: number;     // Material loss events suffered, last 12 months (from Settings)
   totalCostImpact: number;       // Expected loss avoided (mean)
-  lossAvoidedLow: number;        // 5th percentile
+  lossAvoidedLow: number;        // 5th percentile of the expected value
   lossAvoidedMedian: number;
-  lossAvoidedHigh: number;       // 95th percentile
+  lossAvoidedHigh: number;       // 95th percentile of the expected value
   categoryBreakdown: CategoryLossAvoided[];
   totalInvestment: number;       // Annual investment prorated to the period
   totalCostSavings: number;      // Loss avoided − investment (same as netBenefit)
@@ -374,21 +391,55 @@ const PERIOD_SHARE = { yearly: 1, quarterly: 1 / 4, monthly: 1 / 12 } as const;
 const roiPct = (lossAvoided: number, investment: number): number =>
   investment > 0 ? Math.round(((lossAvoided - investment) / investment) * 100) : 0;
 
+// ─── ORGANISATION PROFILE ───────────────────────────────────────────────────
+// Set in Settings. Until the size is chosen, a mid-sized band is assumed and
+// the dashboard says so.
+
+interface Profile {
+  band: RevenueBand;
+  assumed: boolean;
+  lossEventsLast12Months: number;
+  typicalControlEffectiveness: number;
+}
+
+function getProfile(): Profile {
+  const org = getSettings().organisation;
+  const band = getRevenueBand(org?.revenueBand);
+  const typical = Number(org?.typicalControlEffectiveness);
+  return {
+    band: band ?? DEFAULT_REVENUE_BAND,
+    assumed: !band,
+    lossEventsLast12Months: Math.max(0, Number(org?.lossEventsLast12Months) || 0),
+    typicalControlEffectiveness:
+      isFinite(typical) && typical >= 0.2 && typical <= 0.8 ? typical : DEFAULT_RISK_CONFIG.typicalControlEffectiveness,
+  };
+}
+
 // ─── MAIN CALCULATION: calculateCostMetrics ─────────────────────────────────
 // Pipeline:
-//   1. Get all alerts for the period and group them into incidents
-//   2. Score each incident: P(real) × P(escalation) × benchmark loss
-//   3. totalCostImpact = expected loss avoided, with a 5th–95th percentile range
+//   1. Exposure for the period from published loss data for this size of
+//      organisation, with no detection and response
+//   2. Your control effectiveness from the period's resolved incidents
+//   3. totalCostImpact = exposure × control effectiveness, with a range
 //   4. ROI = (loss avoided − investment for the period) / investment
 
 export const calculateRiskSummary = (params: CostCalculationParams): RiskSummary => {
   const { period, selectedQuarter = currentQuarterLabel() } = params;
-  return summariseRisk(getAlertsForPeriod(period, selectedQuarter), isKnownTechnique);
+  const profile = getProfile();
+  const periodYears = PERIOD_SHARE[period];
+  return summariseRisk(getAlertsForPeriod(period, selectedQuarter), isKnownTechnique, {
+    anchor: profile.band,
+    periodYears,
+    lossEventsSuffered: profile.lossEventsLast12Months * periodYears,
+    config: { ...DEFAULT_RISK_CONFIG, typicalControlEffectiveness: profile.typicalControlEffectiveness },
+  });
 };
 
 export const calculateCostMetrics = async (params: CostCalculationParams): Promise<CostMetrics> => {
   const { period, investmentAmount = 0 } = params;
   const risk = calculateRiskSummary(params);
+  const profile = getProfile();
+  const pct = (x: number) => Math.round(x * 1000) / 10;
 
   const totalInvestment = Math.round(investmentAmount * PERIOD_SHARE[period]);
   const totalCostImpact = Math.round(risk.lossAvoided.mean);
@@ -398,13 +449,27 @@ export const calculateCostMetrics = async (params: CostCalculationParams): Promi
     totalAlerts: risk.totalAlerts,
     truePositiveCount: risk.countedAlerts,
     falsePositiveCount: risk.totalAlerts - risk.countedAlerts,
-    truePositiveRate: risk.totalAlerts > 0 ? Math.round((risk.countedAlerts / risk.totalAlerts) * 1000) / 10 : 0,
+    truePositiveRate: risk.totalAlerts > 0 ? pct(risk.countedAlerts / risk.totalAlerts) : 0,
     incidentCount: risk.incidentCount,
     confirmedIncidents: risk.confirmedIncidents,
     unverifiedIncidents: risk.unverifiedIncidents,
     dismissedIncidents: risk.dismissedIncidents,
-    confirmedShare: Math.round(risk.confirmedShare * 1000) / 10,
-    grossExposure: Math.round(risk.grossExposure),
+    confirmedShare: pct(risk.confirmedShare),
+    exposure: Math.round(risk.exposure),
+    controlEffectiveness: pct(risk.controlEffectiveness.mean),
+    controlEffectivenessLow: pct(risk.controlEffectiveness.p5),
+    controlEffectivenessHigh: pct(risk.controlEffectiveness.p95),
+    residualLoss: Math.round(risk.residualLoss),
+    lossProbabilityWithoutControls: pct(risk.annualLossProbabilityWithoutControls),
+    lossProbabilityWithControls: pct(risk.annualLossProbabilityWithControls),
+    peerAnnualLoss: Math.round(risk.peerAnnualLoss),
+    typicalLoss: profile.band.lossMedian,
+    severeLoss: profile.band.lossP95,
+    lossPerEvent: Math.round(risk.lossPerEvent),
+    revenueBand: profile.band.label,
+    profileAssumed: profile.assumed,
+    typicalControlEffectiveness: pct(profile.typicalControlEffectiveness),
+    lossEventsSuffered: profile.lossEventsLast12Months,
     totalCostImpact,
     lossAvoidedLow: Math.round(risk.lossAvoided.p5),
     lossAvoidedMedian: Math.round(risk.lossAvoided.p50),

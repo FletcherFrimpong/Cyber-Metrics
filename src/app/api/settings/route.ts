@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSettings, updateSettings } from "@/lib/settings-store";
 import { requireAuth, isAuthError } from "@/lib/auth/api-guard";
+import { REVENUE_BANDS } from "@/lib/anchor-data.ts";
+import { DEFAULT_RISK_CONFIG } from "@/lib/risk-model";
 
 export async function GET() {
   const auth = await requireAuth("settings:view");
@@ -9,6 +11,13 @@ export async function GET() {
   const s = getSettings();
   return NextResponse.json({
     investmentAmount: s.investmentAmount || 0,
+    organisation: {
+      revenueBand: s.organisation?.revenueBand || "",
+      lossEventsLast12Months: s.organisation?.lossEventsLast12Months || 0,
+      typicalControlEffectiveness: s.organisation?.typicalControlEffectiveness ?? null,
+    },
+    revenueBands: REVENUE_BANDS.map((b) => ({ id: b.id, label: b.label })),
+    defaultTypicalControlEffectiveness: DEFAULT_RISK_CONFIG.typicalControlEffectiveness,
     sentinel: s.sentinel
       ? {
           tenantId: s.sentinel.tenantId || "",
@@ -40,6 +49,7 @@ export async function POST(request: NextRequest) {
 
   const s = updateSettings({
     investmentAmount: body.investmentAmount,
+    organisation: body.organisation,
     sentinel: body.sentinel,
     smtp: body.smtp,
   });

@@ -39,7 +39,7 @@ export default function FinancialMetrics({ timeView, selectedQuarter }: Financia
     {
       label: "Net benefit",
       value: signed(metrics.netBenefit),
-      note: metrics.netBenefit >= 0 ? "Positive ROI" : "Negative ROI",
+      note: "Loss avoided minus investment",
       negative: metrics.netBenefit < 0,
     },
     {
@@ -51,7 +51,11 @@ export default function FinancialMetrics({ timeView, selectedQuarter }: Financia
   ];
 
   return (
-    <Panel icon={DollarSign} title="Financial metrics" subtitle="Loss avoided against security investment">
+    <Panel
+      icon={DollarSign}
+      title="Financial view"
+      subtitle={m ? `${m.controlEffectiveness}% of ${formatCurrency(m.exposure)} exposure removed, anchored to ${m.revenueBand} revenue` : "Loss avoided against security investment"}
+    >
       <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-neutral-200">
         {cells.map((cell) => (
           <div key={cell.label} className="px-3 py-3 min-w-0 bg-white">

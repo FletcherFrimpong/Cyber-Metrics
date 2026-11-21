@@ -25,6 +25,12 @@ export interface AppSettings {
     pollingIntervalMs: number;
   } | null;
   smtp: SmtpSettings | null;
+  /** Organisation profile the dollar figures are anchored to. See src/lib/anchor-data.ts. */
+  organisation: {
+    revenueBand: string | null;
+    lossEventsLast12Months: number;
+    typicalControlEffectiveness: number | null;
+  } | null;
   /** Per-connector credentials, keyed by connector id. See src/lib/connectors. */
   connectors: Record<string, Record<string, string>>;
 }
@@ -33,6 +39,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   investmentAmount: 0,
   sentinel: null,
   smtp: null,
+  organisation: null,
   connectors: {},
 };
 
@@ -125,6 +132,20 @@ export function updateSettings(partial: Partial<AppSettings>): AppSettings {
         pollingIntervalMs: partial.sentinel.pollingIntervalMs ?? ex.pollingIntervalMs,
       };
     }
+  }
+
+  if (partial.organisation !== undefined && partial.organisation !== null) {
+    const ex = current.organisation || { revenueBand: null, lossEventsLast12Months: 0, typicalControlEffectiveness: null };
+    const o = partial.organisation;
+    const typical = Number(o.typicalControlEffectiveness);
+    current.organisation = {
+      revenueBand: o.revenueBand !== undefined ? (o.revenueBand || null) : ex.revenueBand,
+      lossEventsLast12Months:
+        o.lossEventsLast12Months !== undefined ? Math.max(0, Math.floor(Number(o.lossEventsLast12Months) || 0)) : ex.lossEventsLast12Months,
+      typicalControlEffectiveness:
+        o.typicalControlEffectiveness === undefined ? ex.typicalControlEffectiveness
+        : isFinite(typical) && typical >= 0.2 && typical <= 0.8 ? typical : null,
+    };
   }
 
   if (partial.smtp !== undefined) {

@@ -53,7 +53,21 @@ interface CostMetrics {
   unverifiedIncidents: number;
   dismissedIncidents: number;
   confirmedShare: number;
-  grossExposure: number;
+  exposure: number;
+  controlEffectiveness: number;
+  controlEffectivenessLow: number;
+  controlEffectivenessHigh: number;
+  residualLoss: number;
+  lossProbabilityWithoutControls: number;
+  lossProbabilityWithControls: number;
+  peerAnnualLoss: number;
+  typicalLoss: number;
+  severeLoss: number;
+  lossPerEvent: number;
+  revenueBand: string;
+  profileAssumed: boolean;
+  typicalControlEffectiveness: number;
+  lossEventsSuffered: number;
   lossAvoidedLow: number;
   lossAvoidedMedian: number;
   lossAvoidedHigh: number;
@@ -215,33 +229,31 @@ export default function ExecutiveReportsPage(props: { selectedQuarter?: string; 
 
       {m && (
         <>
-          {/* Headline figures */}
-          <Panel icon={DollarSign} title="Summary" subtitle="Loss avoided against security investment">
+          {/* Headline figures: risk reduction first. Net benefit and ROI are in the financial table below. */}
+          <Panel icon={Shield} title="Summary" subtitle="How far your controls reduce the risk of a loss">
             <StatStrip
               className="md:grid-cols-4"
               stats={[
                 {
-                  label: "Expected Loss Avoided",
-                  value: fmt(m.totalCostImpact),
-                  note: `Likely range ${fmt(m.lossAvoidedLow)} – ${fmt(m.lossAvoidedHigh)}`,
+                  label: "Chance of a material loss this year",
+                  value: `${m.lossProbabilityWithControls}%`,
+                  note: `Down from ${m.lossProbabilityWithoutControls}% without detection and response`,
                   lead: true,
                 },
                 {
-                  label: "Net Benefit",
-                  value: fmt(m.netBenefit),
-                  note: "Loss avoided − investment for period",
-                  negative: m.netBenefit < 0,
+                  label: "Severe event at your size",
+                  value: fmt(m.severeLoss),
+                  note: `Typical event ${fmt(m.typicalLoss)}`,
                 },
                 {
-                  label: "ROI",
-                  value: `${m.roi.toLocaleString()}%`,
-                  note: `Range ${m.roiLow.toLocaleString()}% to ${m.roiHigh.toLocaleString()}%`,
-                  negative: m.roi < 0,
+                  label: "Control effectiveness",
+                  value: `${m.controlEffectiveness}%`,
+                  note: `${m.confirmedIncidents} analyst-confirmed incidents, ${m.unverifiedIncidents} unverified`,
                 },
                 {
-                  label: "Incidents Counted",
-                  value: (m.confirmedIncidents + m.unverifiedIncidents).toLocaleString(),
-                  note: `${m.confirmedIncidents} analyst-confirmed, ${m.unverifiedIncidents} unverified`,
+                  label: "Expected Loss Avoided",
+                  value: fmt(m.totalCostImpact),
+                  note: `Plausible range ${fmt(m.lossAvoidedLow)} – ${fmt(m.lossAvoidedHigh)}`,
                 },
               ]}
             />
@@ -273,11 +285,12 @@ export default function ExecutiveReportsPage(props: { selectedQuarter?: string; 
               <table className="w-full">
                 <tbody>
                   {[
-                    ["Security Investment (this period)", fmt(m.totalInvestment)],
+                    ["Exposure without detection and response (this period)", fmt(m.exposure)],
+                    ["Control effectiveness", `${m.controlEffectiveness}% (range ${m.controlEffectivenessLow}% to ${m.controlEffectivenessHigh}%)`],
                     ["Expected Loss Avoided", fmt(m.totalCostImpact)],
-                    ["5th – 95th percentile", `${fmt(m.lossAvoidedLow)} – ${fmt(m.lossAvoidedHigh)}`],
-                    ["Resting on analyst-confirmed incidents", `${m.confirmedShare}%`],
-                    ["Gross exposure (if every incident had escalated)", fmt(m.grossExposure)],
+                    ["Plausible range", `${fmt(m.lossAvoidedLow)} – ${fmt(m.lossAvoidedHigh)}`],
+                    ["Expected loss still carried", fmt(m.residualLoss)],
+                    ["Security Investment (this period)", fmt(m.totalInvestment)],
                   ].map(([label, value]) => (
                     <tr key={label}>
                       <td className={`${td} text-neutral-600`}>{label}</td>
@@ -296,6 +309,30 @@ export default function ExecutiveReportsPage(props: { selectedQuarter?: string; 
               </table>
             </Panel>
           </div>
+
+          {/* What the figures are anchored to */}
+          <Panel icon={BarChart3} title="Anchored to published loss data" subtitle={`Organisations with ${m.revenueBand} revenue${m.profileAssumed ? " (assumed: set your size in Settings)" : ""}`}>
+            <table className="w-full">
+              <tbody>
+                {[
+                  ["Chance of a material loss this year, without detection and response", `${m.lossProbabilityWithoutControls}%`],
+                  ["Chance of a material loss this year, with your controls", `${m.lossProbabilityWithControls}%`],
+                  ["Typical loss per event at this size (published median)", fmt(m.typicalLoss)],
+                  ["Severe loss per event at this size (published 95th percentile)", fmt(m.severeLoss)],
+                  ["Expected loss per event used in the model", fmt(m.lossPerEvent)],
+                  ["What a peer organisation loses per year", fmt(m.peerAnnualLoss)],
+                  ["Assumed effectiveness of a typical organisation's controls", `${m.typicalControlEffectiveness}%`],
+                  ["Material loss events you suffered, last 12 months", String(m.lossEventsSuffered)],
+                  ["Share of the estimate resting on analyst-confirmed incidents", `${m.confirmedShare}%`],
+                ].map(([label, value]) => (
+                  <tr key={label}>
+                    <td className={`${td} text-neutral-600`}>{label}</td>
+                    <td className={`${td} text-right tabular-nums`}>{value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Panel>
 
           {/* Detection performance */}
           <Panel icon={Shield} title="Detection Performance" subtitle="Alerts and incidents in this period">

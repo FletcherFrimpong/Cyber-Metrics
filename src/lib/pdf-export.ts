@@ -23,7 +23,16 @@ export interface TrendsAnalyticsData {
     confirmedIncidents?: number;
     unverifiedIncidents?: number;
     confirmedShare?: number;
-    grossExposure?: number;
+    exposure?: number;
+    controlEffectiveness?: number;
+    residualLoss?: number;
+    lossProbabilityWithoutControls?: number;
+    lossProbabilityWithControls?: number;
+    typicalLoss?: number;
+    severeLoss?: number;
+    revenueBand?: string;
+    profileAssumed?: boolean;
+    typicalControlEffectiveness?: number;
     categoryBreakdown?: { category: string; incidents: number; lossAvoided: number }[];
   };
   quarterlyData: any[];
@@ -122,13 +131,23 @@ const generateBeautifulPDFContent = (data: TrendsAnalyticsData): string => {
   const stat = (label: string, value: string, note = "") => `
     <div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div><div class="note">${esc(note)}</div></div>`;
 
+  // Headline: risk reduction first, then dollars. Investment, net benefit and
+  // ROI follow in their own table.
+  const hasRisk = m?.lossProbabilityWithControls !== undefined && m?.severeLoss !== undefined;
   const summary = m
     ? `<div class="stats">
-        ${stat("Expected loss avoided", money(m.totalCostImpact), m.lossAvoidedLow !== undefined && m.lossAvoidedHigh !== undefined ? `Likely range ${money(m.lossAvoidedLow)} to ${money(m.lossAvoidedHigh)}` : "")}
-        ${stat("Security investment", money(m.totalInvestment), "Annual spend prorated to this period")}
-        ${stat("Net benefit", money(m.netBenefit), "Loss avoided minus investment")}
-        ${stat("ROI", `${m.roi.toLocaleString("en-US")}%`, m.roiLow !== undefined && m.roiHigh !== undefined ? `Range ${m.roiLow.toLocaleString("en-US")}% to ${m.roiHigh.toLocaleString("en-US")}%` : "")}
-      </div>`
+        ${hasRisk ? stat("Chance of a material loss this year", `${m.lossProbabilityWithControls}%`, `Down from ${m.lossProbabilityWithoutControls}% without detection and response`) : ""}
+        ${hasRisk ? stat("Severe event at your size", money(m.severeLoss!), m.typicalLoss !== undefined ? `Typical event ${money(m.typicalLoss)}` : "") : ""}
+        ${m.controlEffectiveness !== undefined ? stat("Control effectiveness", `${m.controlEffectiveness}%`, m.exposure !== undefined ? `Of ${money(m.exposure)} exposure without controls` : "") : ""}
+        ${stat("Expected loss avoided", money(m.totalCostImpact), m.lossAvoidedLow !== undefined && m.lossAvoidedHigh !== undefined ? `Plausible range ${money(m.lossAvoidedLow)} to ${money(m.lossAvoidedHigh)}` : "")}
+      </div>
+      <h2>Financial view</h2>
+      <table>
+        <tr><td>Security investment (annual spend prorated to this period)</td><td class="num">${money(m.totalInvestment)}</td></tr>
+        <tr><td>Net benefit (loss avoided minus investment)</td><td class="num">${money(m.netBenefit)}</td></tr>
+        <tr><td>ROI${m.roiLow !== undefined && m.roiHigh !== undefined ? ` (range ${m.roiLow.toLocaleString("en-US")}% to ${m.roiHigh.toLocaleString("en-US")}%)` : ""}</td><td class="num">${m.roi.toLocaleString("en-US")}%</td></tr>
+      </table>
+      <p class="method">Security spend works like insurance: it pays off in the rare severe year, so an expected-value ROI understates it.</p>`
     : "";
 
   const basis = m && m.confirmedIncidents !== undefined
@@ -138,7 +157,12 @@ const generateBeautifulPDFContent = (data: TrendsAnalyticsData): string => {
          <tr><td>Confirmed true positive by an analyst</td><td class="num">${(m.confirmedIncidents || 0).toLocaleString("en-US")}</td></tr>
          <tr><td>Counted without an analyst verdict (weighted by tool confidence)</td><td class="num">${(m.unverifiedIncidents || 0).toLocaleString("en-US")}</td></tr>
          <tr><td>Share of loss avoided resting on analyst-confirmed incidents</td><td class="num">${m.confirmedShare ?? 0}%</td></tr>
-         ${m.grossExposure !== undefined ? `<tr><td>Gross exposure (if every counted incident had escalated)</td><td class="num">${money(m.grossExposure)}</td></tr>` : ""}
+         ${m.exposure !== undefined ? `<tr><td>Exposure without detection and response (this period)</td><td class="num">${money(m.exposure)}</td></tr>` : ""}
+         ${m.controlEffectiveness !== undefined ? `<tr><td>Share of that exposure your controls removed</td><td class="num">${m.controlEffectiveness}%</td></tr>` : ""}
+         ${m.residualLoss !== undefined ? `<tr><td>Expected loss still carried</td><td class="num">${money(m.residualLoss)}</td></tr>` : ""}
+         ${m.lossProbabilityWithoutControls !== undefined ? `<tr><td>Chance of a material loss this year: without controls / with yours</td><td class="num">${m.lossProbabilityWithoutControls}% / ${m.lossProbabilityWithControls}%</td></tr>` : ""}
+         ${m.typicalLoss !== undefined && m.severeLoss !== undefined ? `<tr><td>Published loss per event at this size: typical / severe</td><td class="num">${money(m.typicalLoss)} / ${money(m.severeLoss)}</td></tr>` : ""}
+         ${m.revenueBand ? `<tr><td>Anchored to organisations with revenue of</td><td class="num">${esc(m.revenueBand)}${m.profileAssumed ? " (assumed)" : ""}</td></tr>` : ""}
        </table>`
     : "";
 
@@ -203,7 +227,7 @@ const generateBeautifulPDFContent = (data: TrendsAnalyticsData): string => {
   </table>
 
   ${m ? `<h2>How the figures are calculated</h2>
-  <p class="method">Each incident's loss avoided is the chance it was a real attack, times the chance it would have escalated had it not been contained (set by the furthest MITRE ATT&amp;CK stage observed), times an industry benchmark loss for its category and severity. Incidents an analyst classified as false or benign positives are excluded. The range is the 5th to 95th percentile of a 5,000-trial simulation. Escalation probabilities are model assumptions and should be calibrated to your organisation.</p>` : ""}
+  <p class="method">The figures start from published loss data for organisations of this size (Cyentia Institute, Information Risk Insights Study): how often such organisations suffer a loss event, and how large those losses are. Because published losses are the events that got past typical controls, dividing by one minus the typical effectiveness (assumed ${m.typicalControlEffectiveness ?? 40}%) gives the exposure with no detection and response. Your own control effectiveness is then estimated from this period's resolved incidents, each weighted by how likely it was a real attack and how far it had progressed, against the loss events you actually suffered. Loss avoided is exposure times that effectiveness, so it cannot exceed the exposure. The published data covers publicly known incidents and direct losses only, so the figures err low. The range reflects uncertainty in the published frequency and in both effectiveness figures.</p>` : ""}
 
   <footer>Signal Foundry · Cyber Risk Quantification Platform · ${esc(period)}</footer>
 </body>

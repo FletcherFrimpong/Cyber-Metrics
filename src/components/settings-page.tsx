@@ -19,6 +19,9 @@ export default function SettingsPage() {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission("settings:edit");
   const [investmentAmount, setInvestmentAmount] = useState("");
+  const [org, setOrg] = useState({ revenueBand: "", lossEvents: "0", typicalPct: "" });
+  const [revenueBands, setRevenueBands] = useState<{ id: string; label: string }[]>([]);
+  const [defaultTypicalPct, setDefaultTypicalPct] = useState(40);
   const [sentinel, setSentinel] = useState<SentinelFormState>({
     tenantId: "",
     clientId: "",
@@ -57,6 +60,15 @@ export default function SettingsPage() {
         const settings = await res.json();
 
         setInvestmentAmount(settings.investmentAmount ? String(settings.investmentAmount) : "");
+        setRevenueBands(settings.revenueBands || []);
+        setDefaultTypicalPct(Math.round((settings.defaultTypicalControlEffectiveness ?? 0.4) * 100));
+        setOrg({
+          revenueBand: settings.organisation?.revenueBand || "",
+          lossEvents: String(settings.organisation?.lossEventsLast12Months ?? 0),
+          typicalPct: settings.organisation?.typicalControlEffectiveness
+            ? String(Math.round(settings.organisation.typicalControlEffectiveness * 100))
+            : "",
+        });
         if (settings.sentinel) {
           setSentinel({
             tenantId: settings.sentinel.tenantId || "",
@@ -99,6 +111,11 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           investmentAmount: parseFloat(investmentAmount) || 0,
+          organisation: {
+            revenueBand: org.revenueBand || null,
+            lossEventsLast12Months: parseInt(org.lossEvents, 10) || 0,
+            typicalControlEffectiveness: org.typicalPct ? parseFloat(org.typicalPct) / 100 : null,
+          },
           sentinel: sentinel.tenantId
             ? {
                 tenantId: sentinel.tenantId,
@@ -195,6 +212,61 @@ export default function SettingsPage() {
               = ${(parseFloat(investmentAmount) / 1000).toFixed(0)}K/year, ${(parseFloat(investmentAmount) / 4 / 1000).toFixed(0)}K/quarter
             </p>
           )}
+        </div>
+      </Panel>
+
+      {/* Organisation profile: what the dollar figures are anchored to */}
+      <Panel icon={Shield} title="Organisation profile" subtitle="Anchors the dollar figures to published loss data">
+        <div className="p-3 space-y-3">
+          <p className="text-[13px] text-neutral-500">
+            Loss avoided is capped by what organisations of your size are known to lose (Cyentia Institute, Information Risk
+            Insights Study). Until you choose a size, $100M – $1B is assumed.
+          </p>
+          <Field label="Annual revenue">
+            <select
+              value={org.revenueBand}
+              onChange={(e) => setOrg((o) => ({ ...o, revenueBand: e.target.value }))}
+              disabled={!canEdit}
+              className="h-8 w-full max-w-xs rounded-md border border-neutral-200 bg-white px-2 text-[13px] text-neutral-900"
+            >
+              <option value="">Not set</option>
+              {revenueBands.map((b) => (
+                <option key={b.id} value={b.id}>{b.label}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Material loss events, last 12 months">
+            <Input
+              type="number"
+              min={0}
+              value={org.lossEvents}
+              onChange={(e) => setOrg((o) => ({ ...o, lossEvents: e.target.value }))}
+              disabled={!canEdit}
+              className="w-24 h-8 bg-white border-neutral-200 text-[13px] text-neutral-900 shadow-none"
+            />
+            <p className="mt-1 text-[12px] text-neutral-400">
+              Incidents that got through and caused a real loss. Each one lowers your measured control effectiveness.
+            </p>
+          </Field>
+          <Field label={<>Typical control effectiveness <span className="text-neutral-400">(optional)</span></>}>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={20}
+                max={80}
+                placeholder={String(defaultTypicalPct)}
+                value={org.typicalPct}
+                onChange={(e) => setOrg((o) => ({ ...o, typicalPct: e.target.value }))}
+                disabled={!canEdit}
+                className="w-24 h-8 bg-white border-neutral-200 text-[13px] text-neutral-900 shadow-none"
+              />
+              <span className="text-[13px] text-neutral-500">%</span>
+            </div>
+            <p className="mt-1 text-[12px] text-neutral-400">
+              Share of serious attacks a typical organisation stops before a material loss. Default {defaultTypicalPct}%, allowed 20–80.
+              This is the model&apos;s most influential assumption and its evidence is thin: a higher value raises every dollar figure.
+            </p>
+          </Field>
         </div>
       </Panel>
 

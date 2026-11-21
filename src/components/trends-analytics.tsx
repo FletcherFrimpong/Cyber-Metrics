@@ -39,7 +39,10 @@ function fmt(n: number): string {
 const EMPTY_METRICS: DashboardMetrics = {
   totalAlerts: 0, truePositiveCount: 0, falsePositiveCount: 0, truePositiveRate: 0,
   incidentCount: 0, confirmedIncidents: 0, unverifiedIncidents: 0, dismissedIncidents: 0,
-  confirmedShare: 0, grossExposure: 0, totalCostImpact: 0, lossAvoidedLow: 0, lossAvoidedMedian: 0,
+  confirmedShare: 0, exposure: 0, controlEffectiveness: 0, controlEffectivenessLow: 0, controlEffectivenessHigh: 0,
+  residualLoss: 0, lossProbabilityWithoutControls: 0, lossProbabilityWithControls: 0, peerAnnualLoss: 0,
+  typicalLoss: 0, severeLoss: 0, lossPerEvent: 0, revenueBand: "", profileAssumed: true,
+  typicalControlEffectiveness: 0, lossEventsSuffered: 0, totalCostImpact: 0, lossAvoidedLow: 0, lossAvoidedMedian: 0,
   lossAvoidedHigh: 0, categoryBreakdown: [], totalInvestment: 0, totalCostSavings: 0, netBenefit: 0,
   roi: 0, roiLow: 0, roiHigh: 0,
 };
@@ -50,7 +53,7 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
 
   const costMetrics = data?.costMetrics ?? EMPTY_METRICS;
   const totalAlerts = data?.totalAlerts ?? 0;
-  // Risk-adjusted loss avoided from the model, not a raw sum of benchmarks
+  // Loss avoided from the anchored model: exposure x control effectiveness
   const totalCostImpact = costMetrics.totalCostImpact;
   const severityCounts: Record<SeverityLevel, number> = data?.severityCounts ?? { Critical: 0, High: 0, Medium: 0, Low: 0 };
   const categoryCounts = useMemo(
@@ -128,40 +131,41 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
       : "green";
   const signed = (n: number) => (n < 0 ? `-${fmt(-n)}` : fmt(n));
 
+  // Headline: how much the risk of a loss is reduced, then the dollars.
+  // ROI sits in the financial line below: in expected-value terms security
+  // spend behaves like insurance, so ROI alone understates it.
   const stats = [
+    {
+      label: "Chance of a material loss this year",
+      value: `${costMetrics.lossProbabilityWithControls}%`,
+      note: `Down from ${costMetrics.lossProbabilityWithoutControls}% without detection and response`,
+      lead: true,
+    },
+    {
+      label: "Severe event at your size",
+      value: fmt(costMetrics.severeLoss),
+      note: `Typical event ${fmt(costMetrics.typicalLoss)}`,
+    },
+    {
+      label: "Control effectiveness",
+      value: `${costMetrics.controlEffectiveness}%`,
+      note: `Of ${fmt(costMetrics.exposure)} exposure without controls`,
+    },
     {
       label: "Expected loss avoided",
       value: fmt(costMetrics.totalCostImpact),
       note: `Range ${fmt(costMetrics.lossAvoidedLow)} – ${fmt(costMetrics.lossAvoidedHigh)}`,
-      lead: true,
-    },
-    {
-      label: "Net benefit",
-      value: signed(costMetrics.netBenefit),
-      note: `After ${fmt(costMetrics.totalInvestment)} investment for the period`,
-      negative: costMetrics.netBenefit < 0,
-    },
-    {
-      label: "ROI",
-      value: `${costMetrics.roi > 0 ? "+" : ""}${costMetrics.roi.toLocaleString()}%`,
-      note: `Range ${costMetrics.roiLow.toLocaleString()}% to ${costMetrics.roiHigh.toLocaleString()}%`,
-      negative: costMetrics.roi < 0,
     },
     {
       label: "True positives",
       value: costMetrics.truePositiveCount.toLocaleString(),
-      note: `${costMetrics.truePositiveRate}% of all alerts`,
-    },
-    {
-      label: "Total alerts",
-      value: totalAlerts.toLocaleString(),
-      note: `Across ${categoryCounts.filter(c => c.count > 0).length} categories`,
+      note: `${costMetrics.truePositiveRate}% of ${totalAlerts.toLocaleString()} alerts, ${categoryCounts.filter(c => c.count > 0).length} categories`,
     },
   ];
 
   return (
     <div className="space-y-3 pb-6">
-      {/* Headline figures: the money leads, counts follow */}
+      {/* Headline figures: risk reduction leads, then dollars, then counts */}
       <div className="rounded-lg border border-neutral-200 bg-white overflow-hidden">
         <div className="flex items-center gap-2 h-10 px-3 border-b border-neutral-200">
           <DollarSign className="w-3.5 h-3.5 text-neutral-500" />
@@ -179,7 +183,7 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
           {stats.map(stat => (
             <div key={stat.label} className="px-3 py-3 min-w-0 bg-white">
               <div className="text-[12px] text-neutral-500">{stat.label}</div>
-              <div className={`mt-1 font-semibold tabular-nums ${stat.lead ? "text-2xl" : "text-lg"} ${stat.negative ? "text-red-600" : "text-neutral-900"}`}>
+              <div className={`mt-1 font-semibold tabular-nums ${stat.lead ? "text-2xl" : "text-lg"} text-neutral-900`}>
                 {stat.value}
               </div>
               <div className="mt-0.5 text-[12px] text-neutral-400 truncate">{stat.note}</div>
@@ -187,6 +191,16 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
           ))}
         </div>
       </div>
+
+      {/* What the dollar figures are anchored to */}
+      {data && (
+        <p className="px-1 text-[12px] text-neutral-500">
+          Anchored to published losses for organisations with {costMetrics.revenueBand} revenue
+          {costMetrics.profileAssumed && <span className="text-yellow-700"> (assumed: set your size in Settings)</span>}.
+          {" "}Against {fmt(costMetrics.totalInvestment)} of security investment for the period: net benefit {signed(costMetrics.netBenefit)}, ROI {costMetrics.roi.toLocaleString()}% (range {costMetrics.roiLow.toLocaleString()}% to {costMetrics.roiHigh.toLocaleString()}%).
+          {" "}Like insurance, security spend pays off in the rare severe year, so ROI alone understates it.
+        </p>
+      )}
 
       {/* Loss avoided by quarter + categories */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
@@ -310,7 +324,7 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
               {[
                 { label: "Threat Level", value: severityCounts.Critical > 10 ? "High" : severityCounts.Critical > 3 ? "Medium" : "Low" },
                 { label: "Risk Exposure", value: totalAlerts > 500 ? "Elevated" : totalAlerts > 200 ? "Moderate" : "Controlled" },
-                { label: "Posture", value: costMetrics.roi > 100 ? "Strong" : costMetrics.roi > 0 ? "Adequate" : "Needs Review" },
+                { label: "Posture", value: costMetrics.controlEffectiveness >= 80 ? "Strong" : costMetrics.controlEffectiveness >= 50 ? "Adequate" : "Needs Review" },
               ].map(item => (
                 <tr key={item.label}>
                   <td className={td}>{item.label}</td>

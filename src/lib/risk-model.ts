@@ -1,21 +1,26 @@
-// CARA risk model — loss avoided from detected-and-contained incidents.
+// CARA risk model — loss avoided by detection and response, anchored to
+// published loss data.
 //
-// For each incident:
+// The dollar figure is built top-down, so it cannot exceed what organisations
+// of this size actually stand to lose:
 //
-//   expected loss avoided = P(real) × P(escalation | stage) × loss if escalated
+//   exposure      = peer loss frequency / (1 - typical control effectiveness)
+//                   x expected loss per event              [published data]
+//   loss avoided  = exposure x YOUR control effectiveness  [your incidents]
 //
-//   P(real)        1 when an analyst classified the incident a true positive,
-//                  0 when classified false/benign positive. With no verdict the
-//                  alert must pass a detection-quality gate and is then weighted
-//                  by the detection tool's confidence.
-//   P(escalation)  chance the attack would have reached its damaging outcome had
-//                  it not been contained, set by the furthest kill-chain stage
-//                  observed (MITRE ATT&CK tactic). Falls back to severity.
-//   loss           benchmark loss for the incident (category × severity). Alerts
-//                  in the same incident are ONE loss event, not one each.
+//   peer loss frequency and loss size come from published studies by revenue
+//   band (see ./anchor-data.ts). Peers' observed losses are the events that got
+//   PAST their controls, so dividing by (1 - typical effectiveness) gives the
+//   exposure with no detection and response at all.
 //
-// Totals are reported as a mean plus a 5th–95th percentile range from a seeded
-// Monte Carlo simulation, so the same data always yields the same numbers.
+//   YOUR control effectiveness is estimated from your own resolved incidents:
+//   each contained incident is weighted by how likely it was real and how far
+//   the attack had got (the "seriousness weight"), set against the loss events
+//   you actually suffered, starting from the typical figure as a prior.
+//
+// Incident weights therefore decide only where you sit between "typical" and
+// "stopped everything", and how the total is shared between categories. They
+// can no longer inflate the total.
 //
 // This file has no runtime imports so it can run in the browser, on the server
 // and under `node --test`.
@@ -27,9 +32,9 @@ import type { SecurityAlert } from "@/types/alerts";
 // published figures: calibrate them per customer before quoting the output.
 
 export interface RiskModelConfig {
-  /** P(escalation) by kill-chain stage, earliest to latest. */
+  /** Seriousness weight by kill-chain stage, earliest to latest: P(a contained incident at this stage would have become a loss event). */
   escalationByStage: Record<KillChainStage, number>;
-  /** P(escalation) when an incident has no usable MITRE mapping. */
+  /** Seriousness weight when an incident has no usable MITRE mapping. */
   escalationBySeverity: Record<Severity, number>;
   /** P(real) for an unverified alert that passes the gate but reports no confidence. */
   defaultUnverifiedConfidence: number;
@@ -37,9 +42,17 @@ export interface RiskModelConfig {
   gateConfidenceWithMitre: number;
   /** Minimum tool confidence (0–100) for an unverified alert WITHOUT a MITRE mapping. */
   gateConfidenceWithoutMitre: number;
-  /** Spread of the loss distribution (lognormal sigma). Benchmark is the mean. */
-  lossSigma: number;
-  /** Monte Carlo trials. */
+  /**
+   * Share of serious attacks a TYPICAL organisation's detection and response
+   * stops before a material loss (0–1). The most influential assumption in the
+   * model; see anchor-data.ts for the evidence behind the default.
+   */
+  typicalControlEffectiveness: number;
+  /** How firmly that typical figure is held (Beta concentration). Lower = wider range. */
+  typicalControlConcentration: number;
+  /** Weight of the typical figure against your own data, in pseudo loss events. */
+  priorStrength: number;
+  /** Monte Carlo trials for the range. */
   trials: number;
 }
 
@@ -72,7 +85,17 @@ export const DEFAULT_RISK_CONFIG: RiskModelConfig = {
   defaultUnverifiedConfidence: 0.5,
   gateConfidenceWithMitre: 70,
   gateConfidenceWithoutMitre: 90,
-  lossSigma: 0.8,
+  // Evidence for 0.4: there is no published measure of exactly this. The closest
+  // is Sophos "State of Ransomware" (organisations hit by ransomware, self-
+  // reported): attack stopped before encryption in 21% (2023), 27% (2024) and
+  // 44% (2025) of cases. Mandiant M-Trends: 43–52% of investigated intrusions
+  // were detected internally rather than by an outside party. Microsoft's "99%
+  // of attacks" figures count commodity attempts, not footholds, and are not
+  // used. The support is weak, so the figure is held loosely (wide range below)
+  // and can be changed in Settings.
+  typicalControlEffectiveness: 0.4,
+  typicalControlConcentration: 10,
+  priorStrength: 2,
   trials: 5000,
 };
 
@@ -174,11 +197,11 @@ export interface IncidentRisk {
   verdict: Verdict;
   alertCount: number;
   stage: KillChainStage | null;
-  /** Benchmark loss had the incident escalated. */
-  loss: number;
   pReal: number;
   pEscalation: number;
-  /** pReal × pEscalation × loss */
+  /** Seriousness weight: pReal × pEscalation. */
+  weight: number;
+  /** This incident's share of the period's loss avoided (filled in by summariseRisk). */
   expectedLossAvoided: number;
 }
 
@@ -213,10 +236,11 @@ export function scoreIncidents(
         ? "dismissed"
         : "unverified";
 
-    // The incident is one loss event: take the largest benchmark among its alerts.
+    // The incident is ONE event however many alerts it raised. Its category is
+    // that of its most severe alert.
     let lead = members[0];
     for (const m of members) {
-      if ((m.alert.costImpact || 0) > (lead.alert.costImpact || 0)) lead = m;
+      if (SEVERITY_RANK[m.alert.severity as Severity] > SEVERITY_RANK[lead.alert.severity as Severity]) lead = m;
     }
 
     let severity: Severity = "Low";
@@ -246,8 +270,6 @@ export function scoreIncidents(
     const pEscalation = stage
       ? config.escalationByStage[stage]
       : config.escalationBySeverity[severity] ?? 0;
-    const loss = Math.max(0, lead.alert.costImpact || 0);
-
     incidents.push({
       id,
       bucket: lead.bucket,
@@ -256,18 +278,70 @@ export function scoreIncidents(
       verdict,
       alertCount: members.length,
       stage,
-      loss,
       pReal,
       pEscalation,
-      expectedLossAvoided: pReal * pEscalation * loss,
+      weight: pReal * pEscalation,
+      expectedLossAvoided: 0,
     });
   }
   return incidents;
 }
 
-// ─── SIMULATION ─────────────────────────────────────────────────────────────
+// ─── LOSS DISTRIBUTION ──────────────────────────────────────────────────────
 
-// Small seeded PRNG (mulberry32) so results are reproducible.
+/** Published loss data for organisations of one size. */
+export interface PeerAnchor {
+  /** Probability of at least one loss event in a year (0–1): central figure. */
+  annualEventProbability: number;
+  /** Published lower and upper bounds for that probability, where available. */
+  annualEventProbabilityLow?: number;
+  annualEventProbabilityHigh?: number;
+  /** Typical (median) loss per event. */
+  lossMedian: number;
+  /** Extreme (95th percentile) loss per event. */
+  lossP95: number;
+}
+
+const Z95 = 1.6448536269514722;
+
+// Standard normal CDF (Abramowitz & Stegun 7.1.26, |error| < 1.5e-7)
+function normalCdf(x: number): number {
+  const t = 1 / (1 + 0.3275911 * Math.abs(x) / Math.SQRT2);
+  const y = 1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(x * x) / 2);
+  return x >= 0 ? 0.5 * (1 + y) : 0.5 * (1 - y);
+}
+
+/** Lognormal through a median and a 95th percentile. */
+export function lognormalFromQuantiles(median: number, p95: number): { mu: number; sigma: number } {
+  return { mu: Math.log(median), sigma: Math.log(p95 / median) / Z95 };
+}
+
+/**
+ * Expected loss per event with every loss capped at the published 95th
+ * percentile. Cyber losses are so skewed that the plain average is driven by a
+ * handful of catastrophes nobody can estimate; capping at the furthest
+ * published point keeps the figure tied to data and errs low.
+ */
+export function expectedLossPerEvent(anchor: PeerAnchor): number {
+  const { mu, sigma } = lognormalFromQuantiles(anchor.lossMedian, anchor.lossP95);
+  const cap = anchor.lossP95;
+  if (sigma <= 0) return anchor.lossMedian;
+  const lnc = Math.log(cap);
+  return (
+    Math.exp(mu + (sigma * sigma) / 2) * normalCdf((lnc - mu - sigma * sigma) / sigma) +
+    cap * (1 - normalCdf((lnc - mu) / sigma))
+  );
+}
+
+/** Events per year implied by P(at least one event in a year). */
+export function annualRate(probability: number): number {
+  const p = Math.min(Math.max(probability, 0), 0.999);
+  return p === 0 ? 0 : -Math.log(1 - p);
+}
+
+// ─── RANDOM NUMBERS ─────────────────────────────────────────────────────────
+
+// Small seeded PRNG (mulberry32) so the same data always gives the same range.
 function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
@@ -287,54 +361,42 @@ function hashString(s: string, h = 2166136261): number {
   return h >>> 0;
 }
 
-export interface LossDistribution {
+function sampleNormal(rand: () => number): number {
+  const u1 = Math.max(rand(), 1e-12);
+  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * rand());
+}
+
+// Gamma(shape, 1) by Marsaglia–Tsang, with the usual boost for shape < 1.
+function sampleGamma(shape: number, rand: () => number): number {
+  if (shape < 1) return sampleGamma(shape + 1, rand) * Math.pow(Math.max(rand(), 1e-12), 1 / shape);
+  const d = shape - 1 / 3;
+  const c = 1 / Math.sqrt(9 * d);
+  for (;;) {
+    let x: number, v: number;
+    do {
+      x = sampleNormal(rand);
+      v = 1 + c * x;
+    } while (v <= 0);
+    v = v * v * v;
+    const u = rand();
+    if (u < 1 - 0.0331 * x * x * x * x || Math.log(Math.max(u, 1e-12)) < 0.5 * x * x + d * (1 - v + Math.log(v))) return d * v;
+  }
+}
+
+function sampleBeta(a: number, b: number, rand: () => number): number {
+  const x = sampleGamma(a, rand);
+  const y = sampleGamma(b, rand);
+  return x / (x + y);
+}
+
+// ─── SUMMARY ────────────────────────────────────────────────────────────────
+
+export interface Estimate {
   mean: number;
   p5: number;
   p50: number;
   p95: number;
 }
-
-/**
- * Distribution of total loss avoided. Each incident independently escalates
- * with probability pReal × pEscalation; if it does, its loss is drawn from a
- * lognormal whose mean is the benchmark.
- */
-export function simulateLossAvoided(
-  incidents: IncidentRisk[],
-  config: RiskModelConfig = DEFAULT_RISK_CONFIG
-): LossDistribution {
-  const live = incidents.filter(i => i.expectedLossAvoided > 0);
-  const mean = live.reduce((s, i) => s + i.expectedLossAvoided, 0);
-  if (live.length === 0) return { mean: 0, p5: 0, p50: 0, p95: 0 };
-
-  let seed = 2166136261;
-  for (const i of live) seed = hashString(i.id, seed);
-  const rand = mulberry32(seed);
-
-  const sigma = config.lossSigma;
-  const p = live.map(i => i.pReal * i.pEscalation);
-  // mu chosen so the lognormal's MEAN equals the benchmark loss.
-  const mu = live.map(i => Math.log(i.loss) - (sigma * sigma) / 2);
-
-  const totals = new Float64Array(config.trials);
-  for (let t = 0; t < config.trials; t++) {
-    let total = 0;
-    for (let k = 0; k < live.length; k++) {
-      if (rand() < p[k]) {
-        // Box–Muller standard normal
-        const u1 = Math.max(rand(), 1e-12);
-        const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * rand());
-        total += Math.exp(mu[k] + sigma * z);
-      }
-    }
-    totals[t] = total;
-  }
-  totals.sort();
-  const q = (f: number) => totals[Math.min(config.trials - 1, Math.floor(f * config.trials))];
-  return { mean, p5: q(0.05), p50: q(0.5), p95: q(0.95) };
-}
-
-// ─── SUMMARY ────────────────────────────────────────────────────────────────
 
 export interface RiskBreakdownRow {
   key: string;
@@ -342,19 +404,44 @@ export interface RiskBreakdownRow {
   expectedLossAvoided: number;
 }
 
+export interface RiskOptions {
+  /** Published loss data for this organisation's size. */
+  anchor: PeerAnchor;
+  /** Length of the reporting period in years (quarter = 0.25). */
+  periodYears: number;
+  /** Material loss events the organisation actually suffered IN THE PERIOD. */
+  lossEventsSuffered?: number;
+  config?: RiskModelConfig;
+}
+
 export interface RiskSummary {
   totalAlerts: number;
-  /** Alerts belonging to incidents that contribute to loss avoided. */
+  /** Alerts belonging to incidents that count toward control effectiveness. */
   countedAlerts: number;
   incidentCount: number;
   confirmedIncidents: number;
   unverifiedIncidents: number; // unverified AND counted (passed the gate)
   dismissedIncidents: number;  // analyst-dismissed or failed the gate
-  /** Share of expected loss avoided that rests on analyst-confirmed incidents (0–1). */
+  /** Share of the seriousness weight that rests on analyst-confirmed incidents (0–1). */
   confirmedShare: number;
-  /** Undiscounted sum of benchmark losses for counted incidents — an upper bound, not an estimate. */
-  grossExposure: number;
-  lossAvoided: LossDistribution;
+  /** Sum of incident weights: contained incidents expressed as would-be loss events. */
+  seriousnessWeight: number;
+  /** What a peer organisation loses in a year, with typical controls in place. */
+  peerAnnualLoss: number;
+  /** Expected loss per event (capped at the published 95th percentile). */
+  lossPerEvent: number;
+  /** Expected loss for the PERIOD with no detection and response at all. */
+  exposure: number;
+  /** Share of that exposure your controls removed (0–1). */
+  controlEffectiveness: Estimate;
+  /** exposure × control effectiveness, for the period. */
+  lossAvoided: Estimate;
+  /** Expected loss still carried in the period. */
+  residualLoss: number;
+  /** Chance of at least one material loss event in a YEAR with no detection and response (0–1). */
+  annualLossProbabilityWithoutControls: number;
+  /** The same chance with your controls (0–1). */
+  annualLossProbabilityWithControls: number;
   byCategory: RiskBreakdownRow[];
   byDepartment: RiskBreakdownRow[];
   incidents: IncidentRisk[];
@@ -372,16 +459,70 @@ function breakdown(incidents: IncidentRisk[], keyOf: (i: IncidentRisk) => string
   return [...map.values()].sort((a, b) => b.expectedLossAvoided - a.expectedLossAvoided);
 }
 
+function quantiles(values: Float64Array, mean: number): Estimate {
+  const sorted = Float64Array.from(values).sort();
+  const q = (f: number) => sorted[Math.min(sorted.length - 1, Math.floor(f * sorted.length))];
+  return { mean, p5: q(0.05), p50: q(0.5), p95: q(0.95) };
+}
+
 export function summariseRisk(
   alerts: ModelAlert[],
   isKnownTechnique: (id: string) => boolean,
-  config: RiskModelConfig = DEFAULT_RISK_CONFIG
+  options: RiskOptions
 ): RiskSummary {
+  const config = options.config ?? DEFAULT_RISK_CONFIG;
+  const T = Math.max(options.periodYears, 0);
+  const suffered = Math.max(options.lossEventsSuffered ?? 0, 0);
+
   const incidents = scoreIncidents(alerts, isKnownTechnique, config);
-  const counted = incidents.filter(i => i.pReal > 0);
+  const counted = incidents.filter(i => i.weight > 0);
   const confirmed = counted.filter(i => i.verdict === "confirmed");
-  const lossAvoided = simulateLossAvoided(incidents, config);
-  const confirmedExpected = confirmed.reduce((s, i) => s + i.expectedLossAvoided, 0);
+  const W = counted.reduce((s, i) => s + i.weight, 0);
+
+  // Published side: what peers lose, and what that implies with no controls.
+  const lossPerEvent = expectedLossPerEvent(options.anchor);
+  const peerRate = annualRate(options.anchor.annualEventProbability);
+  const peerAnnualLoss = peerRate * lossPerEvent;
+  const typical = Math.min(Math.max(config.typicalControlEffectiveness, 0.05), 0.9);
+
+  // Your side: contained (W) against suffered, starting from the typical figure.
+  const effectiveness = (m: number) => {
+    const a = m * config.priorStrength + W;
+    const b = (1 - m) * config.priorStrength + suffered;
+    return { a, b, mean: a / (a + b) };
+  };
+  const point = effectiveness(typical);
+  const exposureAt = (m: number, rate = peerRate) => (rate / (1 - m)) * lossPerEvent * T;
+  const exposure = exposureAt(typical);
+  const inherentRate = peerRate / (1 - typical);
+
+  // The published frequency is itself a range; sample it log-uniformly.
+  const lowRate = annualRate(options.anchor.annualEventProbabilityLow ?? options.anchor.annualEventProbability);
+  const highRate = annualRate(options.anchor.annualEventProbabilityHigh ?? options.anchor.annualEventProbability);
+  const logLow = Math.log(Math.max(lowRate, 1e-9));
+  const logSpan = Math.log(Math.max(highRate, 1e-9)) - logLow;
+  const avoidedMean = exposure * point.mean;
+
+  // Range: uncertainty in the published frequency, the typical figure and your own effectiveness.
+  // (It is a range for the EXPECTED value, not for how any one year turns out.)
+  let seed = hashString(`${T}|${suffered}|${options.anchor.annualEventProbability}|${options.anchor.lossMedian}|${options.anchor.lossP95}`);
+  for (const i of counted) seed = hashString(i.id, seed);
+  const rand = mulberry32(seed);
+  const c = config.typicalControlConcentration;
+  const eff = new Float64Array(config.trials);
+  const avoided = new Float64Array(config.trials);
+  for (let t = 0; t < config.trials; t++) {
+    // Keep the sampled typical figure away from 1, where exposure would explode.
+    const m = Math.min(sampleBeta(typical * c, (1 - typical) * c, rand), 0.9);
+    const { a, b } = effectiveness(m);
+    const mine = sampleBeta(a, b, rand);
+    eff[t] = mine;
+    const rate = logSpan > 0 ? Math.exp(logLow + rand() * logSpan) : peerRate;
+    avoided[t] = exposureAt(m, rate) * mine;
+  }
+
+  // Share the expected total between incidents in proportion to their weight.
+  for (const i of incidents) i.expectedLossAvoided = W > 0 ? (avoidedMean * i.weight) / W : 0;
 
   return {
     totalAlerts: alerts.length,
@@ -390,9 +531,16 @@ export function summariseRisk(
     confirmedIncidents: confirmed.length,
     unverifiedIncidents: counted.length - confirmed.length,
     dismissedIncidents: incidents.length - counted.length,
-    confirmedShare: lossAvoided.mean > 0 ? confirmedExpected / lossAvoided.mean : 0,
-    grossExposure: counted.reduce((s, i) => s + i.loss, 0),
-    lossAvoided,
+    confirmedShare: W > 0 ? confirmed.reduce((s, i) => s + i.weight, 0) / W : 0,
+    seriousnessWeight: W,
+    peerAnnualLoss,
+    lossPerEvent,
+    exposure,
+    controlEffectiveness: quantiles(eff, point.mean),
+    lossAvoided: quantiles(avoided, avoidedMean),
+    residualLoss: exposure - avoidedMean,
+    annualLossProbabilityWithoutControls: 1 - Math.exp(-inherentRate),
+    annualLossProbabilityWithControls: 1 - Math.exp(-inherentRate * (1 - point.mean)),
     byCategory: breakdown(counted, i => i.bucket),
     byDepartment: breakdown(counted, i => i.department),
     incidents,

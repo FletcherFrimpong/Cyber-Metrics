@@ -325,50 +325,41 @@ src/
 
 ## Key Calculations
 
-The model lives in `src/lib/risk-model.ts`; every judgment-based parameter is in `DEFAULT_RISK_CONFIG` at the top of that file. Run `npm test` to check it.
+The model lives in `src/lib/risk-model.ts`, the published data in `src/lib/anchor-data.ts`. Run `npm test` to check both.
 
-**1. Alerts are grouped into incidents.** Alerts that share a Sentinel incident are one loss event, valued at the largest benchmark among them, not one loss each.
-
-**2. Is the incident real? `P(real)`**
+The dollar figure is built top-down, so it cannot exceed what organisations of your size actually stand to lose:
 
 ```
-Analyst classified it truePositive                  -> 1
-Analyst classified it falsePositive / benign        -> 0 (excluded)
-No analyst verdict:
-  known MITRE technique AND tool confidence >= 70%  -> confidence
-  no MITRE technique AND tool confidence >= 90%     -> confidence
-  known MITRE technique, no confidence reported     -> 0.5
-  otherwise                                         -> 0 (excluded)
+exposure      = peer loss frequency / (1 - typical control effectiveness) x expected loss per event
+loss avoided  = exposure x YOUR control effectiveness
+ROI           = (loss avoided - investment for the period) / investment x 100
 ```
 
-Severity alone never makes an alert count. The dashboard shows how much of the result rests on analyst-confirmed incidents.
+**1. Peer loss frequency and loss size (published).** From the Cyentia Institute's Information Risk Insights Study, by annual revenue band: the yearly probability of a loss event (IRIS 2022, Table 2; the geometric mean of Cyentia's lower and upper bounds) and the median and 95th-percentile loss per event (IRIS 2025). Expected loss per event caps each loss at the published 95th percentile. Set your revenue band under **Settings > Organisation profile**; until you do, $100M – $1B is assumed and the dashboard says so.
 
-**3. Would it have escalated? `P(escalation)`** is set by the furthest MITRE ATT&CK tactic observed, from 2% (reconnaissance) to 75% (impact). With no tactic it falls back to severity (Critical 30%, High 15%, Medium 5%, Low 1%). These are default assumptions, not published figures; calibrate them per customer.
+**2. Typical control effectiveness (assumed, 40%).** Published losses are the events that got past typical controls, so dividing by `1 - 0.4` gives the exposure with no detection and response. No study measures this quantity directly. The nearest evidence is Sophos' State of Ransomware (attacks stopped before encryption: 21%, 27% and 44% in 2023 to 2025) and Mandiant M-Trends (43–52% of intrusions detected internally). It is the model's most influential assumption, is held with a wide range, and can be changed in Settings (20–80%).
 
-**4. What would it have cost? (Industry Benchmarks)**
+**3. Your control effectiveness (from your incidents).** Alerts are grouped into incidents. Each contained incident gets a seriousness weight:
 
-Each alert's `costImpact` is the loss had the incident escalated, looked up by category + severity:
-
-| | Critical | High | Medium | Low | Source |
-|---|---|---|---|---|---|
-| **EDR** | $750K | $200K | $45K | $8K | IBM 2024: ransomware $5.13M, containment ≈ 15% |
-| **Email** | $125K | $65K | $12K | $2K | FBI IC3 2024: median BEC loss $125K |
-| **Network** | $500K | $175K | $30K | $5K | IBM 2024: C2 containment before staging |
-| **Web** | $350K | $100K | $15K | $2.5K | IBM 2024: web app attack response costs |
-| **Cloud** | $650K | $225K | $50K | $10K | IBM 2024: cloud breaches 12% premium |
-
-Sources: IBM Cost of a Data Breach 2024, FBI IC3 2024, Ponemon Institute 2023, Verizon DBIR 2024, SANS Institute.
-
-**Risk Quantification:**
 ```
-loss avoided per incident = P(real) x P(escalation) x benchmark loss
-expected loss avoided     = SUM over incidents
-range (5th-95th pct)      = Monte Carlo, 5,000 trials, seeded so results repeat
-investment for the period = annual investment x (1, 1/4 or 1/12)
-ROI                       = (loss avoided - investment) / investment x 100
+weight = P(real) x stage weight
+
+P(real):  analyst said truePositive -> 1;  falsePositive / benign -> 0 (excluded)
+          no verdict: needs a known MITRE technique and tool confidence >= 70%
+          (or confidence >= 90% without one), then weighted by that confidence
+stage weight: by the furthest MITRE ATT&CK tactic seen, 0.02 (reconnaissance)
+          to 0.75 (impact); falls back to severity when there is no tactic
 ```
 
-The dashboard reports the expected value with its range, the ROI range, and "gross exposure" (the undiscounted benchmark sum) as an upper bound for comparison.
+```
+effectiveness = (0.4 x 2 + sum of weights) / (2 + sum of weights + loss events you suffered)
+```
+
+With no incident data this equals the typical 40%. Contained incidents move it toward 100%; loss events you actually suffered (entered in Settings) pull it down. The stage weights are judgment-based defaults, but they now only decide where you sit between "typical" and "stopped everything" and how the total is shared between categories and departments. They cannot inflate the total.
+
+**4. Range.** 5,000 seeded trials over the published frequency bounds and both effectiveness figures give a 5th–95th percentile range for the expected value. It is not a forecast of any single year.
+
+**What the figures do not include.** The published data covers publicly known incidents and direct, quantifiable losses only, and is mostly from US organisations, so results err low. For many mid-sized organisations expected loss avoided will be smaller than security spend: in expected-value terms security behaves like insurance, and the dashboard also shows the chance of a material loss with and without your controls and the size of a severe event.
 
 **Department Resolution (Top Affected Units):**
 
