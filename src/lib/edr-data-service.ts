@@ -1,6 +1,6 @@
 // EDR Data Service
 // Single source of truth for all alert data in the platform.
-// Connects to Microsoft Sentinel to pull resolved incidents.
+// Holds alerts delivered by the connectors (src/lib/connectors) and the stored history.
 // All consumers (cost-calculations, dashboard, trends) go through this service.
 
 import type { SecurityAlert, CategorizedAlerts, EDRQueryParams } from "@/types/alerts";
@@ -11,8 +11,8 @@ export type { CategorizedAlerts } from "@/types/alerts";
 type AlertCategory = "edr" | "email" | "network" | "web" | "cloud";
 
 class EDRDataService {
-  private poller: any = null; // SentinelPoller — lazily imported
-  private sentinelConnected = false;
+  // True once a data source (connector) has been configured
+  private realSourceConnected = false;
 
   // Sentinel alert store — ingested alerts keyed by category
   private sentinelAlerts: Record<AlertCategory, SecurityAlert[]> = {
@@ -34,7 +34,8 @@ class EDRDataService {
 
   constructor() {
     this.loadPersistedAlerts();
-    this.initializeSentinel();
+    // Nothing stored: show demonstration data until a source is connected
+    if (this.sentinelAlertCount === 0) this.loadSampleData();
   }
 
   // ─── PERSISTENCE ───────────────────────────────────────────────────────────
@@ -69,13 +70,6 @@ class EDRDataService {
     }
   }
 
-  private sentinelState() {
-    return {
-      get: () => this.getSourceState("sentinel"),
-      set: (value: string) => this.setSourceState("sentinel", value),
-    };
-  }
-
   /** Last successful poll time for a source, kept across restarts. */
   getSourceState(source: string): string | null {
     try {
@@ -89,41 +83,9 @@ class EDRDataService {
     this.persist((store) => store.setState(source, value));
   }
 
-  // ─── SENTINEL INITIALIZATION ───────────────────────────────────────────────
-
-  private async initializeSentinel(): Promise<void> {
-    // Check env vars directly — avoid importing config module at top level
-    if (!process.env.SENTINEL_TENANT_ID || !process.env.SENTINEL_CLIENT_ID || !process.env.SENTINEL_CLIENT_SECRET) {
-      if (this.sentinelAlertCount === 0) {
-        console.log("No Sentinel configured — loading sample data for demonstration.");
-        this.loadSampleData();
-      }
-      return;
-    }
-
-    // Lazy import — only load when Sentinel is actually configured
-    const { getSentinelConfig } = await import("./sentinel-config");
-    const { SentinelPoller } = await import("./sentinel-poller");
-
-    const config = getSentinelConfig();
-    if (!config) {
-      if (this.sentinelAlertCount === 0) this.loadSampleData();
-      return;
-    }
-
-    console.log("Sentinel configured — starting poller");
-    this.sentinelConnected = true;
-
-    this.poller = new SentinelPoller(config, (alerts, category) => {
-      this.ingestAlerts(alerts as SecurityAlert[], category);
-    }, this.sentinelState());
-
-    this.poller.start();
-  }
-
   // ─── SAMPLE DATA FALLBACK ──────────────────────────────────────────────────
   // Loads demonstration data so the dashboard isn't empty before Sentinel connects.
-  // Automatically replaced by real data when connectSentinel() is called.
+  // Automatically replaced by real data when a connector is configured.
 
   private loadSampleData(): void {
     if (this.sampleDataLoaded) return;
@@ -178,10 +140,11 @@ class EDRDataService {
     console.log("Sample data cleared — switching to real Sentinel data");
   }
 
-  // ─── ALERT INGESTION (from poller or webhook) ──────────────────────────────
+  // ─── ALERT INGESTION (from connectors or the webhook) ──────────────────────────────
 
   /** Called when a real data source connects: drops the demonstration data. */
   useRealData(): void {
+    this.realSourceConnected = true;
     this.clearSampleData();
   }
 
@@ -197,7 +160,8 @@ class EDRDataService {
 
   /** With no data source left, show the demonstration data again. */
   restoreSampleData(): void {
-    if (this.sentinelConnected || this.usingSampleData) return;
+    this.realSourceConnected = false;
+    if (this.usingSampleData) return;
     if (this.sentinelAlertCount > 0) return; // real history from another source is still held
     this.sampleDataLoaded = false;
     this.cache.clear();
@@ -303,92 +267,6 @@ class EDRDataService {
     return all;
   }
 
-  // ─── SENTINEL CONTROL ─────────────────────────────────────────────────────
-
-  // Connect to Sentinel at runtime (called from settings API when user saves creds)
-  async connectSentinel(config: {
-    tenantId: string;
-    clientId: string;
-    clientSecret: string;
-    pollingIntervalMs?: number;
-    [key: string]: any;
-  }): Promise<void> {
-    // Stop existing poller if any
-    if (this.poller) {
-      this.poller.stop();
-      this.poller = null;
-    }
-
-    if (!config.tenantId || !config.clientId || !config.clientSecret) {
-      this.sentinelConnected = false;
-      console.log("Sentinel disconnected — missing credentials");
-      return;
-    }
-
-    // Clear sample data — real data is coming
-    this.clearSampleData();
-
-    const { SentinelPoller } = await import("./sentinel-poller");
-
-    const sentinelConfig = {
-      tenantId: config.tenantId,
-      clientId: config.clientId,
-      clientSecret: config.clientSecret,
-      pollingIntervalMs: config.pollingIntervalMs || 900000,
-      workspaceId: config.workspaceId,
-      resourceGroup: config.resourceGroup,
-      workspaceName: config.workspaceName,
-      subscriptionId: config.subscriptionId,
-    };
-
-    this.poller = new SentinelPoller(sentinelConfig, (alerts, category) => {
-      this.ingestAlerts(alerts as SecurityAlert[], category);
-    }, this.sentinelState());
-
-    this.sentinelConnected = true;
-    this.poller.start();
-    console.log("Sentinel connected — poller started");
-  }
-
-  async syncSentinel(since?: string, fullResync?: boolean) {
-    if (!this.poller) throw new Error("Sentinel not configured");
-    if (fullResync) {
-      // Clear Sentinel's own alerts for a fresh start (other sources are kept)
-      this.removeBySourcePrefix("SENTINEL-");
-      this.setSourceState("sentinel", null);
-    }
-    return this.poller.syncNow(since, fullResync);
-  }
-
-  getSentinelStatus() {
-    if (!this.poller) {
-      return {
-        connected: false,
-        isPolling: false,
-        lastPollTime: null as string | null,
-        totalFetched: 0,
-        categoryBreakdown: { edr: 0, email: 0, network: 0, web: 0, cloud: 0 },
-        recentErrors: [] as string[],
-      };
-    }
-
-    const pollerStatus = this.poller.getStatus();
-    return {
-      connected: this.sentinelConnected,
-      isPolling: pollerStatus.isPolling,
-      lastPollTime: pollerStatus.lastPollTime,
-      totalFetched: pollerStatus.totalFetched,
-      categoryBreakdown: {
-        edr: this.sentinelAlerts.edr.length,
-        email: this.sentinelAlerts.email.length,
-        network: this.sentinelAlerts.network.length,
-        web: this.sentinelAlerts.web.length,
-        cloud: this.sentinelAlerts.cloud.length,
-      },
-      recentErrors: pollerStatus.recentErrors,
-    };
-  }
-
   // ─── DEPARTMENT AGGREGATION ──────────────────────────────────────────────────
   // Aggregates alerts by department for the "Top Affected Units" view.
 
@@ -419,8 +297,8 @@ class EDRDataService {
 
   getStatus() {
     return {
-      hasAPIClient: this.sentinelConnected,
-      useRealData: this.sentinelConnected && !this.usingSampleData,
+      hasAPIClient: this.realSourceConnected,
+      useRealData: this.realSourceConnected && !this.usingSampleData,
       usingSampleData: this.usingSampleData,
       cacheSize: this.cache.size,
       sentinelAlertCount: this.sentinelAlertCount,

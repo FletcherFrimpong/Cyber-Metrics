@@ -18,16 +18,6 @@ export async function GET() {
     },
     revenueBands: REVENUE_BANDS.map((b) => ({ id: b.id, label: b.label })),
     defaultTypicalControlEffectiveness: DEFAULT_RISK_CONFIG.typicalControlEffectiveness,
-    sentinel: s.sentinel
-      ? {
-          tenantId: s.sentinel.tenantId || "",
-          clientId: s.sentinel.clientId || "",
-          clientSecret: s.sentinel.clientSecret ? "••••••••" : "",
-          workspaceId: s.sentinel.workspaceId || "",
-          pollingIntervalMs: s.sentinel.pollingIntervalMs || 900000,
-          connected: !!(s.sentinel.tenantId && s.sentinel.clientId && s.sentinel.clientSecret),
-        }
-      : null,
     smtp: s.smtp
       ? {
           host: s.smtp.host || "",
@@ -46,32 +36,11 @@ export async function POST(request: NextRequest) {
   if (isAuthError(auth)) return auth;
 
   const body = await request.json();
-  const hadSentinel = !!getSettings().sentinel?.tenantId;
-
   const s = updateSettings({
     investmentAmount: body.investmentAmount,
     organisation: body.organisation,
-    sentinel: body.sentinel,
     smtp: body.smtp,
   });
-
-  // Connect Sentinel when credentials were sent; disconnect when it was explicitly removed.
-  if (body.sentinel && s.sentinel?.tenantId) {
-    try {
-      const mod = await import("@/lib/edr-data-service");
-      await mod.default.connectSentinel(s.sentinel);
-    } catch {}
-  } else if (body.sentinel === null && hadSentinel) {
-    try {
-      const mod = await import("@/lib/edr-data-service");
-      const { getConnectorManager, CONNECTORS } = await import("@/lib/connectors/runtime");
-      await mod.default.connectSentinel({ tenantId: "", clientId: "", clientSecret: "" });
-      mod.default.removeBySourcePrefix("SENTINEL-");
-      mod.default.setSourceState("sentinel", null);
-      const manager = getConnectorManager();
-      if (!CONNECTORS.some((c) => manager.isRunning(c.id))) mod.default.restoreSampleData();
-    } catch {}
-  }
 
   return NextResponse.json({ success: true, settings: { investmentAmount: s.investmentAmount } });
 }

@@ -9,6 +9,14 @@ import { crowdStrikeConnector, mapCrowdStrikeAlert } from "./crowdstrike.ts";
 import { sentinelOneConnector, mapSentinelOneThreat } from "./sentinelone.ts";
 import { splunkConnector, mapSplunkNotable, splunkClassification, splunkCategory, parseSearchResults } from "./splunk.ts";
 import { normaliseBaseUrl } from "./http.ts";
+import { createHash } from "node:crypto";
+import { defenderConnector, mapDefenderIncident } from "./defender.ts";
+import { sentinelConnector, mapSentinelIncident } from "./sentinel.ts";
+import { cortexConnector, mapCortexIncident, cortexHeaders, isResolved } from "./cortex.ts";
+import { qradarConnector, mapQRadarOffense, classifyClosingReason } from "./qradar.ts";
+import { elasticConnector, mapElasticAlert, buildQuery, encodeApiKey, field } from "./elastic.ts";
+import { CONNECTORS } from "./registry.ts";
+import { matchCategory, mapProductToCategory } from "./product-category.ts";
 import { summariseRisk } from "../risk-model.ts";
 
 type Handler = (req: { method: string; path: string; query: URLSearchParams; headers: http.IncomingHttpHeaders; body: string }) => [number, unknown];
@@ -272,6 +280,495 @@ test("Splunk: sends a Bearer token and a oneshot notable search, and reports mis
   assert.match(bad.message, /notable search failed/);
   handler = () => [401, { messages: [{ type: "WARN", text: "call not properly authenticated" }] }];
   await assert.rejects(splunkConnector.test({ ...config, token: "nope" }), /credentials were rejected/);
+});
+
+// ─── Microsoft Defender XDR ─────────────────────────────────────────────────
+
+const defenderIncident = {
+  id: "2972395",
+  displayName: "Multi-stage incident involving Initial access & Command and control",
+  status: "resolved",
+  classification: "truePositive",
+  determination: "multiStagedAttack",
+  severity: "high",
+  createdDateTime: "2026-10-18T09:00:00Z",
+  lastUpdateDateTime: "2026-10-19T10:00:00Z",
+  incidentWebUrl: "https://security.microsoft.com/incidents/2972395",
+  alerts: [
+    {
+      id: "da637551227677560813_-961444813",
+      title: "Suspicious PowerShell command line",
+      description: "A suspicious PowerShell activity was observed.",
+      severity: "medium",
+      serviceSource: "microsoftDefenderForEndpoint",
+      productName: "Microsoft Defender for Endpoint",
+      category: "Execution",
+      categories: ["Execution", "DefenseEvasion"],
+      mitreTechniques: ["T1059.001", "T1027"],
+      createdDateTime: "2026-10-18T09:01:00Z",
+      alertWebUrl: "https://security.microsoft.com/alerts/da637",
+      evidence: [
+        { "@odata.type": "#microsoft.graph.security.deviceEvidence", deviceDnsName: "fin-lt-014.contoso.com", osPlatform: "Windows11" },
+        { "@odata.type": "#microsoft.graph.security.userEvidence", userAccount: { accountName: "jdoe", userPrincipalName: "jdoe@contoso.com" } },
+        { "@odata.type": "#microsoft.graph.security.ipEvidence", ipAddress: "203.0.113.7" },
+      ],
+    },
+    {
+      id: "fa2-phish",
+      title: "Email messages containing malicious URL removed after delivery",
+      severity: "informational",
+      serviceSource: "microsoftDefenderForOffice365",
+      category: "InitialAccess",
+      mitreTechniques: ["T1566.002"],
+      createdDateTime: "2026-10-18T08:50:00Z",
+    },
+  ],
+};
+
+test("Defender XDR: techniques are read as plain strings and alerts are sorted by Defender service", () => {
+  const mapped = mapDefenderIncident(defenderIncident);
+  assert.equal(mapped.length, 2);
+  const [endpoint, email] = mapped;
+  assert.equal(endpoint.category, "edr");
+  assert.equal(email.category, "email");
+  assert.deepEqual(endpoint.alert.mitreTechniques, ["T1059.001", "T1027"]);
+  assert.deepEqual(endpoint.alert.mitreTactics, ["Execution", "DefenseEvasion"]);
+  assert.deepEqual(email.alert.mitreTactics, ["InitialAccess"]);
+  assert.equal(endpoint.alert.severity, "Medium");
+  assert.equal(email.alert.severity, "Low");
+  assert.equal(endpoint.alert.rawLog.classification, "truePositive");
+  assert.equal(endpoint.alert.rawLog.incidentId, "DEFENDER-2972395");
+  assert.equal(email.alert.rawLog.incidentId, "DEFENDER-2972395"); // same incident
+  assert.equal(endpoint.alert.platform, "Windows11");
+  assert.deepEqual(endpoint.alert.affectedEntities, ["fin-lt-014.contoso.com", "jdoe@contoso.com"]);
+  assert.deepEqual(endpoint.alert.iocIndicators, ["203.0.113.7"]);
+  // an incident with no alerts still yields one alert
+  assert.equal(mapDefenderIncident({ ...defenderIncident, alerts: [] }).length, 1);
+});
+
+test("Defender XDR: uses the documented filter field and $expand, and follows @odata.nextLink", async () => {
+  seen.length = 0;
+  handler = (req) => {
+    if (req.path === "/tenant-1/oauth2/v2.0/token") return [200, { access_token: "graph-token", expires_in: 3599 }];
+    if (req.path === "/security/incidents") {
+      if (req.headers.authorization !== "Bearer graph-token") return [401, { error: { message: "InvalidAuthenticationToken" } }];
+      if (req.query.get("$skip") === "50") return [200, { value: [{ ...defenderIncident, id: "second", alerts: [defenderIncident.alerts[1]] }] }];
+      return [200, { value: [defenderIncident], "@odata.nextLink": `${base}/security/incidents?$skip=50` }];
+    }
+    return [404, {}];
+  };
+  const config = { tenantId: "tenant-1", clientId: "app-1", clientSecret: "s3cret", __loginUrl: base, __graphUrl: base };
+  const alerts = await defenderConnector.fetchAlerts(config, SINCE);
+  assert.equal(alerts.length, 3);
+  const token = new URLSearchParams(seen.find((c) => c.path.endsWith("/token"))!.body);
+  assert.equal(token.get("scope"), "https://graph.microsoft.com/.default");
+  assert.equal(token.get("grant_type"), "client_credentials");
+  assert.equal(token.get("client_id"), "app-1");
+  const first = seen.find((c) => c.path === "/security/incidents")!;
+  assert.equal(first.query.get("$filter"), `status eq 'resolved' and lastUpdateDateTime ge ${SINCE}`);
+  assert.equal(first.query.get("$expand"), "alerts");
+  assert.equal(first.query.get("$orderby"), null); // not a documented option on this endpoint
+  assert.equal((await defenderConnector.test(config)).ok, true);
+
+  handler = () => [401, { error: "invalid_client", error_description: "AADSTS7000215: Invalid client secret provided." }];
+  await assert.rejects(defenderConnector.test(config), /credentials were rejected.*AADSTS7000215/);
+});
+
+// ─── Microsoft Sentinel (Azure Resource Manager) ────────────────────────────
+
+const armIncident = {
+  id: "/subscriptions/sub-1/resourceGroups/rg-sec/providers/Microsoft.OperationalInsights/workspaces/ws-1/providers/Microsoft.SecurityInsights/Incidents/73e01a99",
+  name: "73e01a99",
+  properties: {
+    title: "Brute force then successful sign-in",
+    description: "Multiple failed sign-ins followed by success.",
+    severity: "High",
+    status: "Closed",
+    classification: "TruePositive",
+    classificationReason: "SuspiciousActivity",
+    createdTimeUtc: "2026-10-22T07:00:00Z",
+    lastModifiedTimeUtc: "2026-10-22T12:00:00Z",
+    incidentNumber: 3177,
+    incidentUrl: "https://portal.azure.com/#asset/Microsoft_Azure_Security_Insights/Incident/73e01a99",
+    additionalData: { alertsCount: 1, tactics: ["CredentialAccess"], alertProductNames: ["Azure Sentinel"] },
+  },
+};
+const armAlert = {
+  kind: "SecurityAlert",
+  name: "alert-guid-1",
+  properties: {
+    systemAlertId: "sys-alert-1",
+    alertDisplayName: "Palo Alto firewall: repeated denied connections",
+    description: "x",
+    productName: "Palo Alto Networks",
+    severity: "Medium",
+    tactics: ["CommandAndControl"],
+    timeGenerated: "2026-10-22T07:05:00Z",
+  },
+};
+
+test("Sentinel: incident classification and each alert's product and tactics are mapped", () => {
+  const [a] = mapSentinelIncident(armIncident, [armAlert]);
+  assert.equal(a.alert.id, "SENTINEL-sys-alert-1");
+  assert.equal(a.category, "network"); // sorted by the product that raised the alert
+  assert.equal(a.alert.severity, "Medium");
+  assert.equal(a.alert.rawLog.classification, "truePositive");
+  assert.equal(a.alert.rawLog.incidentId, "SENTINEL-73e01a99");
+  assert.deepEqual(a.alert.mitreTactics, ["CommandAndControl"]);
+  // without alerts, the incident summary is used
+  const [b] = mapSentinelIncident({ ...armIncident, properties: { ...armIncident.properties, classification: "BenignPositive" } });
+  assert.equal(b.alert.id, "SENTINEL-INC-73e01a99");
+  assert.equal(b.alert.rawLog.classification, "informationalExpectedActivity");
+  assert.deepEqual(b.alert.mitreTactics, ["CredentialAccess"]);
+  assert.equal(mapSentinelIncident({ ...armIncident, properties: { ...armIncident.properties, classification: "FalsePositive" } })[0].alert.rawLog.classification, "falsePositive");
+  // techniques appear only on preview API versions; they are read when present
+  const withTech = { ...armIncident, properties: { ...armIncident.properties, additionalData: { ...armIncident.properties.additionalData, techniques: ["T1110"] } } };
+  assert.deepEqual(mapSentinelIncident(withTech)[0].alert.mitreTechniques, ["T1110"]);
+});
+
+test("Sentinel: signs in for Azure Resource Manager, lists closed incidents and fetches each incident's alerts", async () => {
+  seen.length = 0;
+  const ws = "/subscriptions/sub-1/resourceGroups/rg-sec/providers/Microsoft.OperationalInsights/workspaces/ws-1/providers/Microsoft.SecurityInsights";
+  handler = (req) => {
+    if (req.path === "/tenant-1/oauth2/v2.0/token") return [200, { access_token: "arm-token" }];
+    if (req.headers.authorization !== "Bearer arm-token") return [401, { error: { code: "InvalidAuthenticationToken", message: "bad token" } }];
+    if (req.path === `${ws}/incidents` && req.method === "GET") {
+      if (req.query.get("$skipToken")) return [200, { value: [{ ...armIncident, name: "second" }] }];
+      return [200, { value: [armIncident], nextLink: `${base}${ws}/incidents?api-version=2025-09-01&$skipToken=abc` }];
+    }
+    if (req.path === `${ws}/incidents/73e01a99/alerts` && req.method === "POST") return [200, { value: [armAlert] }];
+    if (req.path === `${ws}/incidents/second/alerts`) return [403, { error: { code: "AuthorizationFailed" } }];
+    return [404, { error: { code: "ResourceNotFound", message: "workspace not found" } }];
+  };
+  const config = { tenantId: "tenant-1", clientId: "app-1", clientSecret: "s", subscriptionId: "sub-1", resourceGroup: "rg-sec", workspaceName: "ws-1", __loginUrl: base, __armUrl: base };
+  const alerts = await sentinelConnector.fetchAlerts(config, SINCE);
+  assert.deepEqual(alerts.map((a) => a.alert.id), ["SENTINEL-sys-alert-1", "SENTINEL-INC-second"]); // second falls back to its summary
+  assert.equal(new URLSearchParams(seen.find((c) => c.path.endsWith("/token"))!.body).get("scope"), "https://management.azure.com/.default");
+  const list = seen.find((c) => c.path === `${ws}/incidents`)!;
+  assert.equal(list.query.get("api-version"), "2025-09-01");
+  assert.equal(list.query.get("$filter"), `properties/status eq 'Closed' and properties/lastModifiedTimeUtc ge ${SINCE}`);
+  assert.equal((await sentinelConnector.test(config)).ok, true);
+  await assert.rejects(sentinelConnector.test({ ...config, workspaceName: "wrong" }), /HTTP 404.*workspace not found/);
+});
+
+// ─── Palo Alto Cortex XDR ───────────────────────────────────────────────────
+
+const cortexIncident = {
+  incident_id: "413",
+  incident_name: null,
+  description: "'Behavioral Threat' generated by XDR Agent detected on host WKS-22 involving user corp\\asmith",
+  severity: "high",
+  manual_severity: null,
+  status: "resolved_true_positive",
+  creation_time: 1761120000000,
+  modification_time: 1761206400000,
+  resolved_timestamp: 1761206400000,
+  resolve_comment: "Contained and reimaged",
+  alert_count: 3,
+  hosts: ["WKS-22:5e1f0a"],
+  users: ["corp\\asmith"],
+  incident_sources: ["XDR Agent"],
+  alert_categories: ["Malware"],
+  mitre_tactics_ids_and_names: ["TA0005 - Defense Evasion", "TA0008 - Lateral Movement"],
+  mitre_techniques_ids_and_names: ["T1036.005 - Masquerading: Match Legitimate Name or Location"],
+  xdr_url: "https://tenant.xdr.us.paloaltonetworks.com/incident-view/413",
+};
+
+test("Cortex XDR: resolution status gives the verdict and MITRE strings are split correctly", () => {
+  const { category, alert } = mapCortexIncident(cortexIncident);
+  assert.equal(category, "edr");
+  assert.equal(alert.id, "CORTEX-413");
+  assert.equal(alert.severity, "High");
+  assert.equal(alert.rawLog.classification, "truePositive");
+  assert.deepEqual(alert.mitreTactics, ["Defense Evasion", "Lateral Movement"]);
+  assert.deepEqual(alert.mitreTechniques, ["T1036.005"]);
+  assert.deepEqual(alert.affectedEntities, ["WKS-22", "corp\\asmith"]);
+  assert.equal(alert.timestamp, new Date(1761120000000).toISOString());
+  const verdict = (status: string) => mapCortexIncident({ ...cortexIncident, status }).alert.rawLog.classification;
+  assert.equal(verdict("resolved_false_positive"), "falsePositive");
+  assert.equal(verdict("resolved_threat_handled"), "truePositive");
+  assert.equal(verdict("resolved_known_issue"), "informationalExpectedActivity");
+  assert.equal(verdict("resolved_duplicate_incident"), "informationalExpectedActivity");
+  assert.equal(verdict("resolved_other"), "unknown");
+  assert.equal(verdict("resolved_auto_resolve"), "unknown");
+  assert.equal(isResolved({ status: "under_investigation" }), false);
+  // null arrays, as seen in Palo Alto's own fixtures
+  const bare = mapCortexIncident({ ...cortexIncident, hosts: null, users: null, mitre_tactics_ids_and_names: null, mitre_techniques_ids_and_names: null, incident_sources: ["PAN NGFW"] });
+  assert.deepEqual(bare.alert.mitreTactics, []);
+  assert.equal(bare.category, "network");
+  assert.equal(mapCortexIncident({ ...cortexIncident, manual_severity: "critical" }).alert.severity, "Critical");
+});
+
+test("Cortex XDR: advanced keys are hashed as SHA-256(key + nonce + timestamp); standard keys are sent as is", () => {
+  const adv = cortexHeaders({ keyId: "7", apiKey: "KEY", keyType: "advanced" }, 1700000000000, "N".repeat(64));
+  assert.equal(adv["x-xdr-auth-id"], "7");
+  assert.equal(adv["x-xdr-timestamp"], "1700000000000");
+  assert.equal(adv["x-xdr-nonce"].length, 64);
+  assert.equal(adv.Authorization, createHash("sha256").update("KEY" + "N".repeat(64) + "1700000000000").digest("hex"));
+  const std = cortexHeaders({ keyId: "7", apiKey: "KEY", keyType: "standard" });
+  assert.deepEqual(std, { "x-xdr-auth-id": "7", Authorization: "KEY" });
+  assert.match(cortexHeaders({ keyId: "7", apiKey: "KEY", keyType: "advanced" })["x-xdr-nonce"], /^[A-Za-z0-9]{64}$/);
+});
+
+test("Cortex XDR: pages through incidents, keeps only resolved ones, and explains a 401", async () => {
+  seen.length = 0;
+  const many = Array.from({ length: 100 }, (_, i) => ({ ...cortexIncident, incident_id: String(i), status: i % 2 ? "resolved_true_positive" : "under_investigation" }));
+  handler = (req) => {
+    if (req.path !== "/public_api/v1/incidents/get_incidents") return [404, {}];
+    if (req.headers["x-xdr-auth-id"] !== "7" || req.headers.authorization !== "KEY") return [401, { reply: { err_code: "401", err_msg: "Public API request unauthorized", err_extra: "" } }];
+    const d = JSON.parse(req.body).request_data;
+    if (d.search_from === 0) return [200, { reply: { total_count: 101, result_count: d.search_to === 1 ? 1 : 100, incidents: d.search_to === 1 ? [many[0]] : many } }];
+    return [200, { reply: { total_count: 101, result_count: 1, incidents: [{ ...cortexIncident, incident_id: "last" }] } }];
+  };
+  const config = { apiUrl: base, keyId: "7", apiKey: "KEY", keyType: "standard" };
+  const alerts = await cortexConnector.fetchAlerts(config, SINCE);
+  assert.equal(alerts.length, 51); // 50 resolved on page one + 1 on page two
+  const first = JSON.parse(seen[0].body).request_data;
+  assert.deepEqual(first.filters, [{ field: "modification_time", operator: "gte", value: new Date(SINCE).getTime() }]);
+  assert.deepEqual(first.sort, { field: "modification_time", keyword: "asc" });
+  assert.deepEqual([first.search_from, first.search_to], [0, 100]);
+  assert.equal(JSON.parse(seen[1].body).request_data.search_from, 100);
+  assert.match((await cortexConnector.test(config)).message, /101 incidents visible/);
+  await assert.rejects(cortexConnector.test({ ...config, apiKey: "WRONG" }), /401.*key type/);
+});
+
+// ─── IBM QRadar ─────────────────────────────────────────────────────────────
+
+const offense = {
+  id: 1288,
+  description: "Multiple Login Failures for the Same User\n preceded by Malware Communication\n",
+  status: "CLOSED",
+  severity: 8,
+  magnitude: 6,
+  start_time: 1761300000000,
+  last_persisted_time: 1761390000000,
+  close_time: 1761390000000,
+  closing_reason_id: 54,
+  categories: ["Malware", "User Login Failure"],
+  offense_source: "10.20.30.40",
+  log_sources: [{ id: 69, name: "Palo Alto PA Series @ fw01", type_id: 206, type_name: "Palo Alto PA Series" }],
+  event_count: 412,
+};
+
+test("QRadar: closing reason gives the verdict, numeric severity is bucketed, no MITRE is invented", () => {
+  const reasons = { "54": "True Positive - Confirmed Incident", "2": "False-Positive, Tuned", "1": "Non-Issue", "3": "Policy Violation" };
+  const { category, alert } = mapQRadarOffense(offense, reasons);
+  assert.equal(alert.id, "QRADAR-1288");
+  assert.equal(category, "network"); // from the log source type
+  assert.equal(alert.severity, "Critical");
+  assert.equal(alert.rawLog.classification, "truePositive");
+  assert.equal(alert.title, "Multiple Login Failures for the Same User preceded by Malware Communication");
+  assert.deepEqual(alert.mitreTactics, []);
+  assert.deepEqual(alert.mitreTechniques, []);
+  assert.equal(alert.timestamp, new Date(1761300000000).toISOString());
+  assert.equal(classifyClosingReason("False-Positive, Tuned"), "falsePositive");
+  assert.equal(classifyClosingReason("Non-Issue"), "informationalExpectedActivity");
+  assert.equal(classifyClosingReason("Non-Issues"), "informationalExpectedActivity");
+  assert.equal(classifyClosingReason("Policy Violation"), "unknown");
+  assert.equal(classifyClosingReason(undefined), "unknown");
+  assert.equal(mapQRadarOffense({ ...offense, severity: 5, closing_reason_id: 2 }, reasons).alert.rawLog.classification, "falsePositive");
+  assert.equal(mapQRadarOffense({ ...offense, severity: 5 }, reasons).alert.severity, "Medium");
+});
+
+test("QRadar: sends the SEC token, filters closed offenses by time, and pages with the Range header", async () => {
+  seen.length = 0;
+  const page = Array.from({ length: 100 }, (_, i) => ({ ...offense, id: i }));
+  handler = (req) => {
+    if (req.headers.sec !== "sec-token") return [401, { http_response: { code: 401, message: "Unauthorized" }, message: "No SEC header present in request." }];
+    if (req.path === "/api/siem/offense_closing_reasons") return [200, [{ id: 54, text: "True Positive", is_reserved: false, is_deleted: false }]];
+    if (req.path === "/api/system/about") return [200, { external_version: "7.5.0", release_name: "7.5.0 UpdatePackage 9" }];
+    if (req.path === "/api/siem/offenses") return [200, req.headers.range === "items=0-99" ? page : req.headers.range === "items=0-0" ? [page[0]] : [{ ...offense, id: 999 }]];
+    return [404, {}];
+  };
+  const config = { host: base, token: "sec-token", verifyTls: "yes", apiVersion: "20.0" };
+  const alerts = await qradarConnector.fetchAlerts(config, SINCE);
+  assert.equal(alerts.length, 101);
+  assert.ok(alerts.every((a) => a.alert.rawLog.classification === "truePositive"));
+  const calls = seen.filter((c) => c.path === "/api/siem/offenses");
+  assert.equal(calls[0].query.get("filter"), `status=CLOSED and last_persisted_time>${new Date(SINCE).getTime()}`);
+  assert.equal(calls[0].query.get("sort"), "+last_persisted_time");
+  assert.equal(calls[0].headers.range, "items=0-99");
+  assert.equal(calls[1].headers.range, "items=100-199");
+  assert.equal(calls[0].headers.version, "20.0");
+  assert.match((await qradarConnector.test(config)).message, /QRadar 7\.5\.0/);
+  // no Version header unless the user set one
+  seen.length = 0;
+  await qradarConnector.test({ ...config, apiVersion: "" });
+  assert.equal(seen[0].headers.version, undefined);
+  await assert.rejects(qradarConnector.test({ ...config, token: "bad" }), /credentials were rejected/);
+});
+
+// ─── Elastic Security ───────────────────────────────────────────────────────
+
+const elasticHit = {
+  _id: "6a1e4f0c",
+  _source: {
+    "@timestamp": "2026-10-25T14:00:00.000Z",
+    "kibana.alert.uuid": "6a1e4f0c",
+    "kibana.alert.rule.name": "Suspicious Execution via Scheduled Task",
+    "kibana.alert.rule.description": "Identifies execution of a suspicious program via scheduled tasks.",
+    "kibana.alert.severity": "high",
+    "kibana.alert.risk_score": 73,
+    "kibana.alert.workflow_status": "closed",
+    "kibana.alert.workflow_reason": "true_positive",
+    "kibana.alert.original_time": "2026-10-25T13:58:12.000Z",
+    "kibana.alert.rule.tags": ["Domain: Endpoint", "OS: Windows", "Tactic: Persistence"],
+    "kibana.alert.rule.threat": [
+      {
+        framework: "MITRE ATT&CK",
+        tactic: { id: "TA0003", name: "Persistence", reference: "https://attack.mitre.org/tactics/TA0003/" },
+        technique: [{ id: "T1053", name: "Scheduled Task/Job", reference: "x", subtechnique: [{ id: "T1053.005", name: "Scheduled Task", reference: "x" }] }],
+      },
+    ],
+    host: { name: "srv-app-03", os: { name: "Windows" } },
+    user: { name: "svc_deploy" },
+  },
+};
+
+test("Elastic: reads flat alert fields and nested host fields, with tactic, technique and sub-technique", () => {
+  const { category, alert } = mapElasticAlert(elasticHit);
+  assert.equal(category, "edr");
+  assert.equal(alert.id, "ELASTIC-6a1e4f0c");
+  assert.equal(alert.severity, "High");
+  assert.equal(alert.rawLog.classification, "truePositive");
+  assert.deepEqual(alert.mitreTactics, ["Persistence"]);
+  assert.deepEqual(alert.mitreTechniques, ["T1053", "T1053.005"]);
+  assert.equal(alert.timestamp, "2026-10-25T13:58:12.000Z");
+  assert.deepEqual(alert.affectedEntities, ["srv-app-03", "svc_deploy"]);
+  assert.equal(alert.platform, "Windows");
+  assert.equal(field({ a: { b: 1 } }, "a.b"), 1);
+  assert.equal(field({ "a.b": 2 }, "a.b"), 2);
+  const src = elasticHit._source;
+  const reason = (r?: string) => mapElasticAlert({ _id: "x", _source: { ...src, "kibana.alert.workflow_reason": r } }).alert.rawLog.classification;
+  assert.equal(reason("false_positive"), "falsePositive");
+  assert.equal(reason("benign_positive"), "informationalExpectedActivity");
+  assert.equal(reason("duplicate"), "informationalExpectedActivity");
+  assert.equal(reason("other"), "unknown");
+  assert.equal(reason(undefined), "unknown"); // closed without a reason, or Stack before 9.2
+  // fully nested _source works too
+  const nested = mapElasticAlert({ _id: "n1", _source: { "@timestamp": "2026-10-25T14:00:00.000Z", kibana: { alert: { uuid: "n1", severity: "critical", rule: { name: "AWS Root Login", tags: ["Domain: Cloud"] } } } } });
+  assert.equal(nested.alert.severity, "Critical");
+  assert.equal(nested.category, "cloud");
+});
+
+test("Elastic: API key is accepted encoded or as id:key, and the query pages by (timestamp, uuid)", () => {
+  assert.equal(encodeApiKey("abc123:secretkey"), Buffer.from("abc123:secretkey").toString("base64"));
+  assert.equal(encodeApiKey("YWJjMTIzOnNlY3JldGtleQ=="), "YWJjMTIzOnNlY3JldGtleQ==");
+  const q1: any = buildQuery(SINCE);
+  assert.deepEqual(q1.query.bool.filter[0], { term: { "kibana.alert.workflow_status": "closed" } });
+  assert.deepEqual(q1.sort, [{ "@timestamp": "asc" }, { "kibana.alert.uuid": "asc" }]);
+  assert.equal(q1.query.bool.filter.length, 2);
+  assert.equal("search_after" in q1, false); // the endpoint drops it
+  const q2: any = buildQuery(SINCE, { ts: "2026-10-25T14:00:00.000Z", uuid: "6a1e" });
+  assert.equal(q2.query.bool.filter.length, 3);
+  assert.deepEqual(q2.query.bool.filter[2].bool.should[0], { range: { "@timestamp": { gt: "2026-10-25T14:00:00.000Z" } } });
+});
+
+test("Elastic: sends ApiKey and kbn-xsrf headers, honours the space, and pages until a short page", async () => {
+  seen.length = 0;
+  const full = Array.from({ length: 1000 }, (_, i) => ({ _id: `u${i}`, _source: { ...elasticHit._source, "kibana.alert.uuid": `u${String(i).padStart(4, "0")}` } }));
+  handler = (req) => {
+    if (req.headers.authorization !== `ApiKey ${Buffer.from("id1:key1").toString("base64")}`) return [401, { statusCode: 401, error: "Unauthorized", message: "missing authentication credentials" }];
+    if (req.path !== "/s/soc/api/detection_engine/signals/search") return [404, { statusCode: 404, error: "Not Found", message: "Not Found" }];
+    const body = JSON.parse(req.body);
+    if (body.size === 0) return [200, { hits: { total: { value: 4821, relation: "eq" }, hits: [] } }];
+    return [200, { hits: { hits: body.query.bool.filter.length === 2 ? full : [elasticHit] } }];
+  };
+  const config = { kibanaUrl: base, apiKey: "id1:key1", space: "soc", verifyTls: "yes" };
+  const alerts = await elasticConnector.fetchAlerts(config, SINCE);
+  assert.equal(alerts.length, 1001);
+  assert.equal(seen[0].headers["kbn-xsrf"], "true");
+  assert.equal(seen[0].method, "POST");
+  const second = JSON.parse(seen[1].body);
+  assert.deepEqual(second.query.bool.filter[2].bool.should[1].bool.filter[1], { range: { "kibana.alert.uuid": { gt: "u0999" } } });
+  assert.match((await elasticConnector.test(config)).message, /4821 alerts visible/);
+  await assert.rejects(elasticConnector.test({ ...config, apiKey: "bad:key" }), /credentials were rejected.*missing authentication/);
+  await assert.rejects(elasticConnector.test({ ...config, space: "" }), /HTTP 404/);
+});
+
+// ─── Category sorting ────────────────────────────────────────────────────────
+
+test("alerts are sorted into the five categories from product names and titles", () => {
+  const cases: [string, string | null][] = [
+    // products
+    ["Microsoft Defender for Endpoint", "edr"],
+    ["CrowdStrike Falcon", "edr"],
+    ["Microsoft Defender for Office 365", "email"],
+    ["Proofpoint TAP", "email"],
+    ["Palo Alto PA Series", "network"],
+    ["Fortinet FortiGate Security Gateway", "network"],
+    ["Azure Firewall", "network"],
+    ["Azure Web Application Firewall", "web"], // WAF is web, not network
+    ["AWS WAF", "web"],
+    ["Zscaler Nss", "web"],
+    ["Blue Coat Web Security Service", "web"],
+    ["Microsoft Defender for Cloud", "cloud"],
+    ["Amazon AWS CloudTrail", "cloud"],
+    ["Okta Identity Management", "cloud"],
+    ["Microsoft Entra ID Protection", "cloud"],
+    ["Microsoft Windows Security Event Log", "edr"],
+    // titles
+    ["Email messages containing malicious URL removed after delivery", "email"],
+    ["Suspicious inbox rule created", "email"],
+    ["SQL injection attempt against customer portal", "web"],
+    ["Impossible travel activity", "cloud"],
+    ["Brute force then successful sign-in", "cloud"],
+    ["Ransomware behaviour on FILESRV-02", "edr"],
+    ["Port scan from internal host", "network"],
+    ["Lateral movement via SMB", "network"],
+    // whole words only
+    ["Tips for kids", null],
+    ["Fedramp boundary review", null],
+    ["Quarterly review", null],
+  ];
+  for (const [text, expected] of cases) assert.equal(matchCategory(text), expected, text);
+  assert.equal(mapProductToCategory("Quarterly review"), "cloud");
+  assert.equal(mapProductToCategory("Quarterly review", "network"), "network");
+});
+
+test("connectors categorise from the most specific evidence they have", () => {
+  // Splunk: the security domain decides, except that email and web have no domain of their own
+  assert.equal(splunkCategory({ security_domain: "endpoint", rule_name: "Endpoint - Suspicious DNS Query - Rule" }), "edr");
+  assert.equal(splunkCategory({ security_domain: "network", rule_name: "Network - Unusual Outbound Volume - Rule" }), "network");
+  assert.equal(splunkCategory({ security_domain: "threat", rule_name: "Threat - Phishing Link Clicked - Rule" }), "email");
+  assert.equal(splunkCategory({ security_domain: "network", rule_name: "Network - Web Proxy Blocked Category - Rule" }), "web");
+  assert.equal(splunkCategory({ security_domain: "identity", rule_name: "Identity - Activity from Expired Account - Rule" }), "cloud");
+  assert.equal(splunkCategory({ security_domain: "threat", rule_name: "Threat - Watchlisted Event Observed - Rule" }), "edr");
+  // Sentinel: analytics-rule alerts all say "Azure Sentinel", so the titles decide
+  const sentinel = (product: string, alertTitle: string, incidentTitle = "x") =>
+    mapSentinelIncident({ ...armIncident, properties: { ...armIncident.properties, title: incidentTitle } }, [{ properties: { ...armAlert.properties, productName: product, alertDisplayName: alertTitle } }])[0].category;
+  assert.equal(sentinel("Azure Sentinel", "Malicious inbox rule and phishing campaign"), "email");
+  assert.equal(sentinel("Azure Sentinel", "Rare process on endpoint with PowerShell"), "edr");
+  assert.equal(sentinel("Azure Sentinel", "Anomalous sign-in from unfamiliar location"), "cloud");
+  assert.equal(sentinel("Microsoft Defender for Endpoint", "Suspicious activity"), "edr");
+  assert.equal(sentinel("Azure Sentinel", "Unclassifiable", "Unclassifiable"), "cloud"); // documented fallback
+  // QRadar: log source type first, then categories and description; falls back to network
+  const q = (o: any) => mapQRadarOffense({ ...offense, log_sources: [], categories: [], description: "x", ...o }).category;
+  assert.equal(q({ log_sources: [{ type_name: "Microsoft Windows Security Event Log", name: "DC01" }] }), "edr");
+  assert.equal(q({ log_sources: [{ type_name: "Proofpoint Enterprise Protection", name: "pp" }] }), "email");
+  assert.equal(q({ log_sources: [{ type_name: "Amazon AWS CloudTrail", name: "ct" }] }), "cloud");
+  assert.equal(q({ categories: ["Web Exploit"], description: "SQL Injection detected" }), "web");
+  assert.equal(q({}), "network");
+  // Cortex: the raising product decides before any keyword
+  const cx = (o: any) => mapCortexIncident({ ...cortexIncident, incident_sources: [], alert_categories: [], description: "x", ...o }).category;
+  assert.equal(cx({ incident_sources: ["XDR Agent"], description: "Phishing payload executed" }), "edr");
+  assert.equal(cx({ incident_sources: ["PAN NGFW"] }), "network");
+  assert.equal(cx({ incident_sources: ["Prisma Cloud"] }), "cloud");
+  assert.equal(cx({ incident_sources: ["Correlation"], description: "Impossible travel for user" }), "cloud");
+  assert.equal(cx({ incident_sources: ["Correlation"] }), "edr");
+});
+
+// ─── Registry ───────────────────────────────────────────────────────────────
+
+test("eight connectors are registered with unique ids and alert prefixes", () => {
+  assert.deepEqual(CONNECTORS.map((c) => c.id), ["defender", "sentinel", "splunk", "qradar", "elastic", "crowdstrike", "sentinelone", "cortex"]);
+  assert.equal(new Set(CONNECTORS.map((c) => c.idPrefix)).size, CONNECTORS.length);
+  for (const c of CONNECTORS) {
+    assert.ok(c.fields.some((f) => f.type === "password" && f.required), `${c.id} has a secret field`);
+    assert.ok(c.setupSteps.length >= 2 && c.docsUrl.startsWith("https://"), c.id);
+    // no prefix may be the start of another, or disconnecting one source would delete another's alerts
+    for (const other of CONNECTORS) if (other !== c) assert.ok(!other.idPrefix.startsWith(c.idPrefix), `${c.idPrefix} vs ${other.idPrefix}`);
+  }
 });
 
 // ─── Shared ─────────────────────────────────────────────────────────────────

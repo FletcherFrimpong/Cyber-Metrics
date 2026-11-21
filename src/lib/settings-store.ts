@@ -17,6 +17,7 @@ export interface SmtpSettings {
 
 export interface AppSettings {
   investmentAmount: number;
+  /** Legacy, always null after load: see migrate(). */
   sentinel: {
     tenantId: string;
     clientId: string;
@@ -53,12 +54,27 @@ function loadFromDisk(): AppSettings {
   try {
     if (existsSync(SETTINGS_FILE)) {
       const raw = readFileSync(SETTINGS_FILE, "utf-8");
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+      return migrate({ ...DEFAULT_SETTINGS, ...JSON.parse(raw) });
     }
   } catch (err) {
     console.error("Failed to read settings file:", err);
   }
   return { ...DEFAULT_SETTINGS };
+}
+
+// Earlier versions stored one Microsoft connection under "sentinel". It always
+// called the Graph security API, which is Microsoft Defender XDR, so it moves to
+// the defender connector.
+function migrate(settings: AppSettings): AppSettings {
+  const legacy = settings.sentinel;
+  if (legacy?.tenantId && legacy.clientId && legacy.clientSecret) {
+    settings.connectors = settings.connectors || {};
+    if (!settings.connectors.defender) {
+      settings.connectors.defender = { tenantId: legacy.tenantId, clientId: legacy.clientId, clientSecret: legacy.clientSecret };
+    }
+  }
+  settings.sentinel = null;
+  return settings;
 }
 
 function saveToDisk(settings: AppSettings) {
@@ -114,24 +130,6 @@ export function updateSettings(partial: Partial<AppSettings>): AppSettings {
 
   if (partial.investmentAmount !== undefined) {
     current.investmentAmount = Math.max(0, Number(partial.investmentAmount) || 0);
-  }
-
-  if (partial.sentinel !== undefined) {
-    if (partial.sentinel === null) {
-      current.sentinel = null;
-    } else {
-      const ex = current.sentinel || { tenantId: "", clientId: "", clientSecret: "", workspaceId: "", pollingIntervalMs: 900000 };
-      current.sentinel = {
-        tenantId: partial.sentinel.tenantId ?? ex.tenantId,
-        clientId: partial.sentinel.clientId ?? ex.clientId,
-        clientSecret:
-          partial.sentinel.clientSecret && partial.sentinel.clientSecret !== "••••••••"
-            ? partial.sentinel.clientSecret
-            : ex.clientSecret,
-        workspaceId: partial.sentinel.workspaceId ?? ex.workspaceId,
-        pollingIntervalMs: partial.sentinel.pollingIntervalMs ?? ex.pollingIntervalMs,
-      };
-    }
   }
 
   if (partial.organisation !== undefined && partial.organisation !== null) {

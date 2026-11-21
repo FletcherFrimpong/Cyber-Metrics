@@ -354,7 +354,7 @@ export default function ExecutiveReportsPage(props: { selectedQuarter?: string; 
             <Panel icon={AlertTriangle} title="No data">
               <div className="p-6 text-center">
                 <p className="text-[13px] text-neutral-600">No incident data available for {selectedQuarter}</p>
-                <p className="text-[12px] text-neutral-400 mt-1">Connect Microsoft Sentinel and sync incidents to see metrics here.</p>
+                <p className="text-[12px] text-neutral-400 mt-1">Connect a data source under Settings → Integrations to see metrics here.</p>
               </div>
             </Panel>
           )}

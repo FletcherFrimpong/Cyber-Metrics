@@ -25,16 +25,14 @@ export async function GET(request: NextRequest) {
       investmentAmount,
     });
 
-    // Get sentinel status for alert counts
-    const sentinelStatus = edrDataService.getSentinelStatus();
+    const dataStatus = edrDataService.getStatus();
 
     return NextResponse.json({
       success: true,
       costMetrics,
-      sentinelStatus: {
-        connected: sentinelStatus.connected,
-        categoryBreakdown: sentinelStatus.categoryBreakdown,
-        totalFetched: sentinelStatus.totalFetched,
+      dataSource: {
+        usingSampleData: dataStatus.usingSampleData,
+        alertsHeld: dataStatus.sentinelAlertCount,
       },
       investmentAmount,
       timestamp: new Date().toISOString(),

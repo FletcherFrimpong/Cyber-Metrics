@@ -67,6 +67,7 @@ export interface DashboardData {
   categories: DashboardCategory[];
   severityCounts: Record<"Critical" | "High" | "Medium" | "Low", number>;
   departments: DashboardDepartment[];
+  sources: { source: string; alerts: number; incidents: number; lossAvoided: number }[];
   trend: { quarter: string; alerts: number; cost: number }[];
 }
 

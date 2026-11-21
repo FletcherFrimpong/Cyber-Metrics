@@ -58,7 +58,7 @@ export default function DashboardPage({ selectedQuarter, timeView }: DashboardPa
     {
       label: "Top Affected Department",
       value: summary.topDept?.name || "—",
-      note: summary.topDept ? `${summary.topDept.alerts} incidents, ${summary.deptCount} departments` : "Connect Sentinel to see data",
+      note: summary.topDept ? `${summary.topDept.alerts} incidents, ${summary.deptCount} departments` : "Connect a data source to see data",
     },
   ];
 

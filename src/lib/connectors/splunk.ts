@@ -8,6 +8,7 @@
 import type { SecurityAlert } from "../../types/alerts";
 import { getIncidentCost } from "../cost-benchmarks.ts";
 import { request, expectOk, normaliseBaseUrl, type HttpResponse } from "./http.ts";
+import { matchCategory } from "./product-category.ts";
 import type { ConnectorDefinition, ConnectorConfig, CategorizedAlert, AlertCategory } from "./types";
 
 const MAX_RESULTS = 10000; // Splunk's default max_count for a search job
@@ -51,15 +52,17 @@ export function splunkClassification(notable: any): string {
 
 /** Splunk is a SIEM, so one feed spans every category: sort each notable into ours. */
 export function splunkCategory(notable: any): AlertCategory {
-  const text = `${notable?.rule_name || ""} ${notable?.rule_title || ""} ${notable?.search_name || ""}`.toLowerCase();
-  if (/\b(e-?mail|phish|spam|mailbox)\b/.test(text)) return "email";
-  if (/\b(aws|azure|gcp|cloud|o365|office 365|kubernetes|saas)\b/.test(text)) return "cloud";
-  if (/\b(web|proxy|waf|http|url|sql injection|xss)\b/.test(text)) return "web";
   const domain = String(notable?.security_domain || "").toLowerCase();
+  // ES rule names start with their domain ("Endpoint - ...", "Network - ..."):
+  // strip that prefix so it is the rule's subject that is matched.
+  const strip = (v: unknown) => String(v || "").replace(/^\s*(access|endpoint|network|threat|identity|audit)\s*-\s*/i, "");
+  const subject = matchCategory(`${strip(notable?.rule_title)} ${strip(notable?.rule_name)} ${strip(notable?.search_name)}`);
+  // Email and web have no ES security domain of their own, so the subject decides those.
+  if (subject === "email" || subject === "web") return subject;
   if (domain === "endpoint") return "edr";
   if (domain === "network") return "network";
   if (domain === "access" || domain === "identity" || domain === "audit") return "cloud";
-  return "edr";
+  return subject ?? "edr";
 }
 
 export function mapSplunkNotable(notable: any): CategorizedAlert {

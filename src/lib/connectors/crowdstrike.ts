@@ -105,7 +105,7 @@ export function mapCrowdStrikeAlert(alert: any): CategorizedAlert {
 
 function baseUrl(config: ConnectorConfig): string {
   // __baseUrl is a test hook; the API only accepts the declared fields, so it cannot be set from outside.
-  return config.__baseUrl || CROWDSTRIKE_CLOUDS[config.cloud] || CROWDSTRIKE_CLOUDS["us-1"];
+  return config.__baseUrl || process.env.SF_CROWDSTRIKE_URL || CROWDSTRIKE_CLOUDS[config.cloud] || CROWDSTRIKE_CLOUDS["us-1"];
 }
 
 async function getToken(config: ConnectorConfig): Promise<string> {

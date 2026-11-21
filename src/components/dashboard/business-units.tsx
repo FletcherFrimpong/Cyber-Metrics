@@ -32,8 +32,8 @@ export default function BusinessUnits({ selectedQuarter, timeView = "quarterly" 
     >
       {topDepartments.length === 0 ? (
         <p className="p-3 text-[13px] text-neutral-500">
-          No department data available. Connect Microsoft Sentinel with User.Read.All permission
-          to automatically detect departments from Azure AD.
+          No department data available. Connect Microsoft Defender XDR with the User.Read.All permission
+          to detect departments automatically from Entra ID.
         </p>
       ) : (
         <table className="w-full">

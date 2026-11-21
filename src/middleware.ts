@@ -9,6 +9,8 @@ const PUBLIC_PATHS = [
   "/api/auth/setup",
   "/api/auth/signup",
   "/api/auth/accept-invite",
+  // Called by an automation rule with no login session; it checks its own HMAC signature.
+  "/api/sentinel/webhook",
 ];
 
 function getSecret(): Uint8Array {

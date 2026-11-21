@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Shield, AlertTriangle, Activity, DollarSign, Calendar, TrendingUp } from "lucide-react";
+import { Shield, AlertTriangle, Activity, DollarSign, Calendar, TrendingUp, Plug } from "lucide-react";
 import { Panel, Tag, th, td } from "@/components/ui/panel";
 import { useDashboardData, type DashboardMetrics } from "@/hooks/useDashboardData";
 import type { TrendsAnalyticsData } from "@/lib/pdf-export";
@@ -266,6 +266,33 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
           </table>
         </Panel>
       </div>
+
+      {/* Which integrations the figures come from */}
+      <Panel icon={Plug} title="Data sources" subtitle="Alerts and loss avoided by integration">
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className={th}>Integration</th>
+              <th className={`${th} text-right`}>Alerts</th>
+              <th className={`${th} text-right`}>Incidents counted</th>
+              <th className={`${th} text-right`}>Loss avoided</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(data?.sources ?? []).map((src) => (
+              <tr key={src.source}>
+                <td className={`${td} font-medium`}>{src.source}</td>
+                <td className={`${td} text-right tabular-nums`}>{src.alerts.toLocaleString()}</td>
+                <td className={`${td} text-right tabular-nums`}>{src.incidents.toLocaleString()}</td>
+                <td className={`${td} text-right tabular-nums`}>{src.incidents > 0 ? fmt(src.lossAvoided) : "—"}</td>
+              </tr>
+            ))}
+            {(data?.sources ?? []).length === 0 && (
+              <tr><td className={`${td} text-neutral-500`} colSpan={4}>No alerts in this period.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </Panel>
 
       {/* Severity + key risk indicators */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">

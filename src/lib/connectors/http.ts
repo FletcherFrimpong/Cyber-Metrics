@@ -8,6 +8,8 @@ import http from "node:http";
 export interface HttpResponse {
   status: number;
   text: string;
+  /** Response headers, lower-cased names. */
+  headers: Record<string, string>;
   json<T = any>(): T;
 }
 
@@ -73,9 +75,14 @@ export function request(url: string, options: HttpOptions = {}): Promise<HttpRes
         res.on("data", (c) => chunks.push(c));
         res.on("end", () => {
           const text = Buffer.concat(chunks).toString("utf-8");
+          const headers: Record<string, string> = {};
+          for (const [k, v] of Object.entries(res.headers)) {
+            if (v !== undefined) headers[k.toLowerCase()] = Array.isArray(v) ? v.join(", ") : String(v);
+          }
           resolve({
             status: res.statusCode || 0,
             text,
+            headers,
             json: () => {
               try {
                 return JSON.parse(text);
@@ -101,11 +108,18 @@ export function request(url: string, options: HttpOptions = {}): Promise<HttpRes
 function vendorMessage(text: string): string {
   try {
     const body = JSON.parse(text);
-    const first = body?.errors?.[0] ?? body?.messages?.[0] ?? body?.error ?? body;
+    const pick = (v: any): string | undefined =>
+      typeof v === "string" ? v : v?.message || v?.text || v?.detail || v?.title || v?.err_msg;
+    // Most specific first: a description beats a bare error code.
     const msg =
-      typeof first === "string" ? first :
-      first?.message || first?.text || first?.detail || first?.title || body?.error_description || body?.message;
-    if (msg) return String(msg).slice(0, 200);
+      body?.error_description ||
+      pick(body?.errors?.[0]) ||
+      pick(body?.messages?.[0]) ||
+      pick(body?.reply) ||
+      (typeof body?.error === "object" ? pick(body.error) : undefined) ||
+      body?.message ||
+      pick(body?.error);
+    if (msg) return String(msg).replace(/\s+/g, " ").trim().slice(0, 240);
   } catch {
     // not JSON
   }

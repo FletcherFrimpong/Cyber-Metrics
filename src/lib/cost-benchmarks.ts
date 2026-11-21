@@ -12,7 +12,7 @@
 // model (./risk-model.ts) applies that probability per incident, by kill-chain
 // stage. Do not sum these directly as "loss avoided".
 
-import type { AlertCategory } from "./sentinel-category-mapper";
+import type { AlertCategory } from "./connectors/types";
 
 type Severity = "Critical" | "High" | "Medium" | "Low";
 

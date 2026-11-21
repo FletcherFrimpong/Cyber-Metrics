@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Target, RefreshCw, FileText, Calendar, BarChart3, Settings, LogOut, User, Users, PanelLeft, LayoutDashboard, Wallet } from "lucide-react"
+import { Target, RefreshCw, FileText, Calendar, BarChart3, Settings, LogOut, User, Users, PanelLeft, LayoutDashboard, Wallet, Bell } from "lucide-react"
 import TrendsAnalytics from "@/components/trends-analytics"
 import { TacticalDashboardLayout } from "@/components/tactical-dashboard-layout"
 import ExecutiveReport from "@/app/executive-reports/page"
+import AlertsBrowser from "@/components/alerts-browser"
 import SettingsPage from "@/components/settings-page"
 import UserManagement from "@/components/user-management"
 import ErrorBoundary from "@/components/debug-error-boundary"
@@ -15,7 +16,7 @@ type NavItem = {
   id: string
   icon: React.ComponentType<{ className?: string }>
   label: string
-  permission: "dashboard:view" | "reports:view" | "settings:view" | "users:manage"
+  permission: "dashboard:view" | "reports:view" | "alerts:view" | "settings:view" | "users:manage"
 }
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
@@ -25,6 +26,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { id: "trends-analytics", icon: LayoutDashboard, label: "Trends & analytics", permission: "dashboard:view" },
       { id: "executive-reports", icon: FileText, label: "Executive reports", permission: "reports:view" },
       { id: "security-report", icon: Wallet, label: "Executive security report", permission: "reports:view" },
+      { id: "alerts", icon: Bell, label: "Alerts", permission: "alerts:view" },
     ],
   },
   {
@@ -109,6 +111,10 @@ export default function HomePage() {
 
     if (activeSection === "security-report") {
       return <ExecutiveReport selectedQuarter={selectedQuarter} timeView={timeView} />
+    }
+
+    if (activeSection === "alerts") {
+      return <AlertsBrowser timeView={timeView} selectedQuarter={selectedQuarter} />
     }
 
     if (activeSection === "user-management") {

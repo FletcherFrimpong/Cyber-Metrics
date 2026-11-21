@@ -132,7 +132,7 @@ export default function SettingsPage() {
     );
 
   return (
-    <div className="w-full max-w-3xl pb-6">
+    <div className={`w-full pb-6 ${tab === "integrations" ? "max-w-6xl" : "max-w-3xl"}`}>
       {/* Section tabs */}
       <div role="tablist" aria-label="Settings sections" className="inline-flex items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5">
         {TABS.map((t) => (

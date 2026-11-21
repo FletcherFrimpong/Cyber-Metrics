@@ -33,31 +33,11 @@ interface ConnectorInfo {
   alertsHeld: number;
 }
 
-interface SentinelValues {
-  tenantId: string;
-  clientId: string;
-  clientSecret: string;
-  workspaceId: string;
-}
-
 type Result = { success: boolean; message: string } | null;
 type State = "connected" | "error" | "off";
+type Filter = "all" | "siem" | "tool" | "connected";
 
 const inputClass = "h-8 bg-white border-neutral-200 text-[13px] text-neutral-900 shadow-none";
-
-const SENTINEL = {
-  id: "sentinel",
-  name: "Microsoft Sentinel",
-  description: "Resolved incidents and their alerts from every tool connected to your Sentinel workspace.",
-  setupSteps: [
-    "Go to Azure Portal → App Registrations → New Registration",
-    "Add API permission: Microsoft Graph → SecurityIncident.Read.All",
-    "Add API permission: Microsoft Graph → SecurityAlert.Read.All",
-    "Grant admin consent for the permissions",
-    "Create a client secret under Certificates & Secrets",
-    "Copy the Tenant ID, Client ID, and Client Secret below",
-  ],
-};
 
 // ─── Shared pieces ──────────────────────────────────────────────────────────
 
@@ -104,25 +84,32 @@ function Spinner({ show }: { show: boolean }) {
 
 // ─── Card ───────────────────────────────────────────────────────────────────
 
-function IntegrationCard({
-  id, name, description, state, detail, onOpen,
-}: {
-  id: string; name: string; description: string; state: State; detail?: string; onOpen: () => void;
-}) {
+const KIND_LABEL = { siem: "Log source", tool: "Direct tool" } as const;
+
+function IntegrationCard({ connector, state, onOpen }: { connector: ConnectorInfo; state: State; onOpen: () => void }) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="group flex flex-col text-left rounded-lg border border-neutral-200 bg-white p-4 hover:border-neutral-300 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-neutral-900"
+      className={`group flex h-full flex-col text-left rounded-lg border bg-white p-4 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-neutral-900 ${
+        state === "connected" ? "border-green-300" : state === "error" ? "border-red-300" : "border-neutral-200 hover:border-neutral-300"
+      }`}
     >
-      <div className="flex items-center justify-between gap-3 w-full h-8">
-        <Logo id={id} name={name} className="h-7 max-w-[60%]" />
+      {/* Every logo sits in the same box, so wordmarks and square marks line up */}
+      <div className="flex items-start justify-between gap-3 w-full">
+        <div className="flex h-9 w-32 items-center">
+          <Logo id={connector.id} name={connector.name} className="max-h-7 max-w-full" />
+        </div>
         <StateTag state={state} />
       </div>
-      <div className="mt-3 text-[14px] font-medium text-neutral-900">{name}</div>
-      <p className="mt-1 text-[13px] text-neutral-500 flex-1">{description}</p>
-      <div className="mt-3 flex items-center justify-between w-full text-[12px]">
-        <span className="text-neutral-400 truncate">{detail}</span>
+      <div className="mt-3 text-[14px] font-medium text-neutral-900">{connector.name}</div>
+      {/* Two lines for every card keeps the grid rows even */}
+      <p className="mt-1 text-[13px] leading-snug text-neutral-500 line-clamp-2 min-h-[2.6em]">{connector.description}</p>
+      <div className="mt-auto pt-3 flex items-center justify-between w-full text-[12px]">
+        <span className="text-neutral-400">
+          {KIND_LABEL[connector.kind]}
+          {connector.configured && ` · ${connector.alertsHeld.toLocaleString()} alerts held`}
+        </span>
         <span className="flex items-center gap-0.5 text-neutral-700 group-hover:text-neutral-900 shrink-0">
           {state === "off" ? "Set up" : "Manage"}
           <ChevronRight className="w-3.5 h-3.5" />
@@ -239,150 +226,20 @@ function ConnectorForm({ connector, canEdit, onChanged }: { connector: Connector
   );
 }
 
-// ─── Sentinel form ──────────────────────────────────────────────────────────
-
-function SentinelForm({
-  initial, configured, status, canEdit, onChanged,
-}: {
-  initial: SentinelValues; configured: boolean; status: any; canEdit: boolean; onChanged: () => void;
-}) {
-  const [values, setValues] = useState<SentinelValues>(initial);
-  const [busy, setBusy] = useState<"test" | "save" | "sync" | "remove" | null>(null);
-  const [result, setResult] = useState<Result>(null);
-
-  useEffect(() => setValues(initial), [initial]);
-
-  const missing = !values.tenantId || !values.clientId || !values.clientSecret;
-  const set = (key: keyof SentinelValues) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setValues((v) => ({ ...v, [key]: e.target.value }));
-
-  const post = async (url: string, body: unknown) => {
-    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-    return res.json();
-  };
-
-  const run = async (action: "test" | "save" | "sync" | "remove") => {
-    setBusy(action);
-    setResult(null);
-    try {
-      if (action === "test") {
-        const data = await post("/api/sentinel/test", { tenantId: values.tenantId, clientId: values.clientId, clientSecret: values.clientSecret });
-        setResult({ success: !!data.success, message: data.message || data.error || (data.success ? "Connection works." : "Connection failed.") });
-      } else if (action === "save") {
-        const data = await post("/api/settings", { sentinel: values });
-        setResult({ success: !!data.success, message: data.success ? "Saved. Incidents will be pulled every 15 minutes." : data.error || "Failed to save." });
-        onChanged();
-      } else if (action === "sync") {
-        const data = await post("/api/sentinel/sync", {});
-        setResult({ success: !!data.success, message: data.success ? "Sync started." : data.error || "Sync failed." });
-        onChanged();
-      } else {
-        const data = await post("/api/settings", { sentinel: null });
-        setResult({ success: !!data.success, message: data.success ? "Disconnected. Its alerts were removed." : data.error || "Failed to disconnect." });
-        onChanged();
-      }
-    } catch (err: any) {
-      setResult({ success: false, message: err?.message || "Request failed" });
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const breakdown = status?.categoryBreakdown;
-  return (
-    <div className="space-y-3">
-      <SetupSteps steps={SENTINEL.setupSteps} />
-
-      <Field label="Tenant ID">
-        <Input placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value={values.tenantId} onChange={set("tenantId")} disabled={!canEdit} autoComplete="off" className={inputClass} />
-      </Field>
-      <Field label="Client ID (Application ID)">
-        <Input placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value={values.clientId} onChange={set("clientId")} disabled={!canEdit} autoComplete="off" className={inputClass} />
-      </Field>
-      <Field label="Client Secret">
-        <Input type="password" placeholder="Enter client secret" value={values.clientSecret} onChange={set("clientSecret")} disabled={!canEdit} autoComplete="off" className={inputClass} />
-      </Field>
-      <Field label={<>Workspace ID <span className="text-neutral-400">(optional)</span></>}>
-        <Input placeholder="Log Analytics workspace ID" value={values.workspaceId} onChange={set("workspaceId")} disabled={!canEdit} autoComplete="off" className={inputClass} />
-      </Field>
-
-      {status?.connected && (
-        <div className="bg-neutral-50 border border-neutral-200 rounded-md p-3">
-          <p className="text-[13px] text-neutral-800 font-medium mb-2">Ingestion Status</p>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[13px]">
-            <div className="flex justify-between"><span className="text-neutral-500">Status</span><span className="text-green-600">Active</span></div>
-            <div className="flex justify-between"><span className="text-neutral-500">Last Poll</span><span className="text-neutral-700">{status.lastPollTime ? new Date(status.lastPollTime).toLocaleString() : "Pending..."}</span></div>
-            {breakdown && (["edr", "email", "network", "web", "cloud"] as const).map((k) => (
-              <div key={k} className="flex justify-between">
-                <span className="text-neutral-500">{k === "edr" ? "EDR" : k.charAt(0).toUpperCase() + k.slice(1)} Alerts</span>
-                <span className="text-neutral-700 tabular-nums">{breakdown[k]}</span>
-              </div>
-            ))}
-          </div>
-          {status.recentErrors?.length > 0 && <p className="mt-2 text-[12px] text-red-600 break-words">{status.recentErrors[status.recentErrors.length - 1]}</p>}
-        </div>
-      )}
-
-      {canEdit ? (
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Button variant="outline" size="sm" onClick={() => run("test")} disabled={!!busy || missing} className="h-7 text-xs shadow-none">
-            <Spinner show={busy === "test"} />
-            Test Connection
-          </Button>
-          <Button size="sm" onClick={() => run("save")} disabled={!!busy || missing} className="h-7 bg-neutral-900 hover:bg-neutral-800 text-white text-xs">
-            <Spinner show={busy === "save"} />
-            Save and connect
-          </Button>
-          {configured && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => run("sync")} disabled={!!busy} className="h-7 text-xs shadow-none">
-                <Spinner show={busy === "sync"} />
-                Sync now
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => run("remove")} disabled={!!busy} className="h-7 text-xs text-red-600 hover:text-red-700">
-                Disconnect
-              </Button>
-            </>
-          )}
-        </div>
-      ) : (
-        <p className="text-[12px] text-neutral-400">Only administrators can change integrations.</p>
-      )}
-      <ResultLine result={result} />
-    </div>
-  );
-}
-
 // ─── The Integrations tab ───────────────────────────────────────────────────
 
 export default function Integrations({ canEdit }: { canEdit: boolean }) {
   const [connectors, setConnectors] = useState<ConnectorInfo[] | null>(null);
-  const [sentinel, setSentinel] = useState<{ values: SentinelValues; configured: boolean; status: any }>({
-    values: { tenantId: "", clientId: "", clientSecret: "", workspaceId: "" },
-    configured: false,
-    status: null,
-  });
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Filter>("all");
 
   const load = useCallback(async () => {
     try {
-      const [cRes, sRes, stRes] = await Promise.all([fetch("/api/connectors"), fetch("/api/settings"), fetch("/api/sentinel/status")]);
-      const c = await cRes.json();
-      if (!cRes.ok) throw new Error(c.error || "Failed to load integrations");
-      const s = sRes.ok ? await sRes.json() : {};
-      const st = stRes.ok ? await stRes.json() : null;
-      setConnectors(c.connectors);
-      setSentinel({
-        values: {
-          tenantId: s.sentinel?.tenantId || "",
-          clientId: s.sentinel?.clientId || "",
-          clientSecret: s.sentinel?.clientSecret || "",
-          workspaceId: s.sentinel?.workspaceId || "",
-        },
-        configured: !!s.sentinel?.connected,
-        status: st,
-      });
+      const res = await fetch("/api/connectors");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load integrations");
+      setConnectors(data.connectors);
       setError(null);
     } catch (err: any) {
       setError(err.message);
@@ -401,68 +258,83 @@ export default function Integrations({ canEdit }: { canEdit: boolean }) {
   }
 
   const stateOf = (c: ConnectorInfo): State => (c.status?.lastError ? "error" : c.configured ? "connected" : "off");
-  const detailOf = (c: ConnectorInfo) => (c.configured ? `${c.alertsHeld.toLocaleString()} alerts held` : "");
-  const sentinelState: State = sentinel.status?.recentErrors?.length ? "error" : sentinel.configured ? "connected" : "off";
-  const sentinelHeld = sentinel.status?.categoryBreakdown
-    ? Object.values(sentinel.status.categoryBreakdown as Record<string, number>).reduce((a, b) => a + b, 0)
-    : 0;
 
   const siems = connectors.filter((c) => c.kind === "siem");
   const tools = connectors.filter((c) => c.kind === "tool");
-  const siemConnected = sentinel.configured || siems.some((c) => c.configured);
-  const toolConnected = tools.some((c) => c.configured);
+  const connected = connectors.filter((c) => c.configured);
+  const siemsConnected = siems.filter((c) => c.configured).length;
+  const toolsConnected = tools.filter((c) => c.configured).length;
   const open = connectors.find((c) => c.id === openId);
 
-  return (
-    <div className="space-y-6">
-      <section>
-        <h3 className="text-[13px] font-medium text-neutral-900">Log sources</h3>
-        <p className="mt-0.5 mb-3 text-[13px] text-neutral-500">
-          A SIEM already collects alerts from all your security tools, so one log source covers every alert category. Connect the one you use.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <IntegrationCard
-            id={SENTINEL.id}
-            name={SENTINEL.name}
-            description={SENTINEL.description}
-            state={sentinelState}
-            detail={sentinel.configured ? `${sentinelHeld.toLocaleString()} alerts held` : ""}
-            onOpen={() => setOpenId(SENTINEL.id)}
-          />
-          {siems.map((c) => (
-            <IntegrationCard key={c.id} id={c.id} name={c.name} description={c.description} state={stateOf(c)} detail={detailOf(c)} onOpen={() => setOpenId(c.id)} />
-          ))}
-        </div>
-      </section>
+  const FILTERS: { id: Filter; label: string; count: number; note: string }[] = [
+    { id: "all", label: "All", count: connectors.length, note: "Connect the system your analysts close incidents in. One log source is usually all you need." },
+    { id: "siem", label: "Log sources", count: siems.length, note: "A SIEM or XDR portal already collects alerts from your security tools, so one log source covers every alert category." },
+    { id: "tool", label: "Direct tools", count: tools.length, note: "For a security tool whose alerts do not reach a log source you have connected." },
+    { id: "connected", label: "Connected", count: connected.length, note: "Sources currently feeding the dashboard." },
+  ];
+  const active = FILTERS.find((f) => f.id === filter)!;
 
-      <section>
-        <h3 className="text-[13px] font-medium text-neutral-900">Direct tool connections</h3>
-        <p className="mt-0.5 mb-3 text-[13px] text-neutral-500">
-          For a security tool that does not feed a log source above. Each covers only its own alert category.
-        </p>
-        {siemConnected && (
-          <div className={`mb-3 flex items-start gap-2 rounded-md border px-3 py-2 text-[13px] ${toolConnected ? "border-yellow-200 bg-yellow-50 text-yellow-700" : "border-neutral-200 bg-neutral-50 text-neutral-600"}`}>
-            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-            A log source is connected. Only connect a tool here if its alerts do not already reach that log source; otherwise they are counted twice.
-          </div>
-        )}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {tools.map((c) => (
-            <IntegrationCard key={c.id} id={c.id} name={c.name} description={c.description} state={stateOf(c)} detail={detailOf(c)} onOpen={() => setOpenId(c.id)} />
+  // Connected sources first, then log sources before direct tools, in catalogue order.
+  const shown = connectors
+    .filter((c) => filter === "all" || (filter === "connected" ? c.configured : c.kind === filter))
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => Number(b.c.configured) - Number(a.c.configured) || a.i - b.i)
+    .map(({ c }) => c);
+
+  // Counting the same alerts twice is the one mistake this page can cause.
+  const warning =
+    siemsConnected > 1
+      ? "More than one log source is connected. If the same incidents reach both (for example Sentinel onboarded to the Defender portal), they are counted twice."
+      : siemsConnected > 0 && toolsConnected > 0
+      ? "A log source and a direct tool are both connected. If that tool's alerts already reach the log source, they are counted twice."
+      : null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div role="tablist" aria-label="Filter integrations" className="inline-flex items-center gap-0.5 rounded-lg border border-neutral-200 bg-neutral-50 p-0.5">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              role="tab"
+              aria-selected={filter === f.id}
+              onClick={() => setFilter(f.id)}
+              className={`flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[13px] ${
+                filter === f.id ? "bg-white text-neutral-900 font-medium shadow-sm" : "text-neutral-600 hover:text-neutral-900"
+              }`}
+            >
+              {f.label}
+              <span className="tabular-nums text-neutral-400">{f.count}</span>
+            </button>
           ))}
         </div>
-      </section>
+        <span className="text-[13px] text-neutral-500">
+          {connected.length === 0 ? "Nothing connected yet: the dashboard is showing demo data." : `${connected.length} of ${connectors.length} connected`}
+        </span>
+      </div>
+
+      <p className="text-[13px] text-neutral-500">{active.note}</p>
+
+      {warning && (
+        <div className="flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-[13px] text-yellow-700">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          {warning}
+        </div>
+      )}
+
+      {shown.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-neutral-200 px-4 py-8 text-center text-[13px] text-neutral-500">
+          Nothing connected yet. Choose All to pick a source.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {shown.map((c) => (
+            <IntegrationCard key={c.id} connector={c} state={stateOf(c)} onOpen={() => setOpenId(c.id)} />
+          ))}
+        </div>
+      )}
 
       {/* Configuration opens in a dialog */}
-      <Dialog
-        open={openId === SENTINEL.id}
-        onOpenChange={(o) => !o && setOpenId(null)}
-        title={SENTINEL.name}
-        description={SENTINEL.description}
-        header={<Logo id={SENTINEL.id} name={SENTINEL.name} className="h-7 w-7 mt-0.5" />}
-      >
-        <SentinelForm initial={sentinel.values} configured={sentinel.configured} status={sentinel.status} canEdit={canEdit} onChanged={load} />
-      </Dialog>
       <Dialog
         open={!!open}
         onOpenChange={(o) => !o && setOpenId(null)}

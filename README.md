@@ -1,6 +1,6 @@
 # SignalFoundry - Cyber Risk Quantification Platform
 
-SignalFoundry connects to your Microsoft Sentinel SIEM and quantifies the financial impact of your security operations. It pulls resolved incidents, identifies true positives using MITRE ATT&CK validation, and calculates the actual cyber risk your security tools are preventing.
+SignalFoundry connects to your SIEM or security tools and quantifies how far your detection and response reduce the risk of a loss. It pulls resolved incidents with their analyst verdicts, and anchors the dollar figures to published loss data for organisations of your size.
 
 ![SignalFoundry Login Screen](docs/login-screen.png)
 
@@ -39,16 +39,32 @@ SignalFoundry maps alerts from 80+ security products into 5 categories:
 
 ## Data Sources
 
-Configure these under **Settings**. Each one pulls closed or resolved alerts every 15 minutes, with the analyst's verdict.
+Configure these under **Settings → Integrations**. Each one pulls closed or resolved alerts every 15 minutes, with the analyst's verdict where the product records one.
 
-| Source | Kind | What it pulls | Credentials |
-|--------|------|---------------|-------------|
-| **Microsoft Sentinel** | Log source (SIEM) | Resolved incidents and their alerts, all categories | Azure AD app registration |
-| **Splunk Enterprise Security** | Log source (SIEM) | Closed notable events (findings) with disposition, all categories | Management URL (port 8089) + authentication token |
-| **CrowdStrike Falcon** | Direct tool | Closed alerts (endpoint, identity, cloud workload) | API client with `Alerts: Read` |
-| **SentinelOne** | Direct tool | Resolved threats (endpoint) | Console URL + service-user API token |
+| Source | Kind | What it pulls | Verdict comes from | Credentials |
+|--------|------|---------------|--------------------|-------------|
+| **Microsoft Defender XDR** | Log source | Resolved incidents and alerts (Microsoft Graph security API) | Incident classification | App registration with `SecurityIncident.Read.All`, `SecurityAlert.Read.All` |
+| **Microsoft Sentinel** | Log source | Closed incidents and alerts from a workspace (Azure Resource Manager API) | Incident classification | App registration with the Microsoft Sentinel Reader role, plus subscription, resource group and workspace |
+| **Splunk Enterprise Security** | Log source | Closed notable events (findings) | Disposition | Management URL (port 8089) + authentication token |
+| **IBM QRadar** | Log source | Closed offenses | Closing reason text | Console URL + authorized service token |
+| **Elastic Security** | Log source | Closed detection alerts | Closing reason (Stack 9.2+) | Kibana URL + API key |
+| **CrowdStrike Falcon** | Direct tool | Closed alerts | Resolution | API client with `Alerts: Read` |
+| **SentinelOne** | Direct tool | Resolved threats | Analyst verdict | Console URL + service-user API token |
+| **Palo Alto Cortex XDR** | Direct tool | Resolved incidents | Resolution status | API URL + key ID + key |
 
-A SIEM already aggregates your security tools, so connect one log source and leave the direct tool connections for tools that do **not** feed it. Connecting a tool both ways counts its alerts twice.
+Things to know:
+
+- A log source already aggregates your security tools, so connect one and leave the direct tool connections for tools that do **not** feed it. Connecting the same alerts two ways counts them twice. The same applies to Defender XDR and Sentinel if Sentinel is onboarded to the Defender portal.
+- **QRadar** has no true/false-positive field and no MITRE fields. An offense counts only if its closing reason says it was real (for example a custom "True Positive" reason); the default reasons only mark false positives and non-issues.
+- **Elastic** records a verdict only as the closing reason, from Stack 9.2. Earlier versions are weighted by MITRE mapping alone.
+- **Department attribution** is available only from Defender XDR (it needs `User.Read.All` and `Device.Read.All`).
+- Earlier versions labelled the Graph API connection "Microsoft Sentinel". A saved connection of that kind is moved to Defender XDR automatically, and the `SENTINEL_TENANT_ID` / `SENTINEL_CLIENT_ID` / `SENTINEL_CLIENT_SECRET` environment variables now configure Defender XDR.
+
+**Seeing the data arrive.** The **Alerts** screen lists every alert behind the dashboard with its integration, category, severity, analyst verdict, MITRE tactic and department, and counts alerts per integration. **Trends & analytics** has a Data sources table showing alerts, counted incidents and loss avoided per integration.
+
+**Categories.** Every alert is sorted into Endpoint, Email, Network, Web or Cloud (identity alerts count as Cloud). Each connector uses the most specific evidence it has first: the product or log source that raised the alert, then the alert title, then the incident title (`src/lib/connectors/product-category.ts`).
+
+**Other clouds.** For Microsoft sovereign clouds set `SF_MS_LOGIN_URL`, `SF_GRAPH_URL` and `SF_ARM_URL` (for example `https://login.microsoftonline.us`, `https://graph.microsoft.us/v1.0`, `https://management.usgovcloudapi.net`). `SF_CROWDSTRIKE_URL` overrides the CrowdStrike API host.
 
 Connectors live in `src/lib/connectors/`. To add one, implement `ConnectorDefinition` (`types.ts`) and list it in `registry.ts`. `npm test` runs each connector against a local server that answers the way the vendor's documentation describes; none has been run against a live customer tenant yet.
 
@@ -440,14 +456,14 @@ All configurable from the UI. Viewers see settings read-only. SMTP can also be s
 | POST | `/api/sentinel/sync` | Trigger manual sync from Sentinel | `sentinel:sync` |
 | POST | `/api/sentinel/webhook` | Receive pushed incidents (HMAC auth) | HMAC signature |
 
-## Sentinel Webhook Setup (Optional)
+## Incident Webhook (Optional)
 
-For real-time ingestion (instead of waiting for the 15-min poll):
+For real-time ingestion from Microsoft Defender XDR or Sentinel, instead of waiting for the 15-minute poll:
 
-1. In Sentinel, create an Automation Rule triggered on incident status change to "Resolved"
-2. Set action to call a Logic App
-3. In the Logic App, POST the incident payload to `https://your-domain/api/sentinel/webhook`
-4. Set the `x-sentinel-signature` header with HMAC-SHA256 of the body using your webhook secret
+1. Set `DEFENDER_WEBHOOK_SECRET` on the server (the endpoint refuses every call until it is set).
+2. Create an automation rule or Logic App that fires when an incident is resolved.
+3. POST the incident, in Microsoft Graph security format with its `alerts`, to `https://your-domain/api/sentinel/webhook` as `{"incident": {...}}` or `{"incidents": [...]}`.
+4. Set the `x-sentinel-signature` header to the HMAC-SHA256 hex digest of the request body, keyed with the secret.
 
 ## Tech Stack
 
@@ -466,13 +482,11 @@ All settings below can also be configured from the **Settings** page in the UI (
 # Authentication (required in production)
 AUTH_SECRET=your-secure-random-secret    # openssl rand -base64 32
 
-# Sentinel connection (or configure via Settings UI)
+# Microsoft Defender XDR connection (or configure under Settings → Integrations)
 SENTINEL_TENANT_ID=your-azure-ad-tenant-id
 SENTINEL_CLIENT_ID=your-app-registration-client-id
 SENTINEL_CLIENT_SECRET=your-client-secret
-SENTINEL_WORKSPACE_ID=your-log-analytics-workspace-id     # optional
-SENTINEL_POLLING_INTERVAL=900000                           # optional, default 15min
-SENTINEL_WEBHOOK_SECRET=your-hmac-secret                   # optional
+DEFENDER_WEBHOOK_SECRET=your-hmac-secret                   # optional, enables the incident webhook
 
 # SMTP for email invitations (or configure via Settings UI)
 SMTP_HOST=smtp.gmail.com

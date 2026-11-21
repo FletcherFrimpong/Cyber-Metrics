@@ -34,15 +34,13 @@ export function startSavedConnectors(): void {
   g.__sfConnectorsStarted = true;
   const settings = getSettings();
 
-  // Sentinel credentials saved in Settings are re-used after a restart.
-  const sentinel = settings.sentinel;
-  if (sentinel?.tenantId && sentinel.clientId && sentinel.clientSecret && !edrDataService.getSentinelStatus().connected) {
-    void edrDataService.connectSentinel(sentinel).catch((err: any) => {
-      console.error("Sentinel reconnect failed:", err?.message || err);
-    });
+  const saved: Record<string, ConnectorConfig> = { ...(settings.connectors || {}) };
+  // Credentials supplied through the environment (the original SENTINEL_* names
+  // are kept; they always addressed the Defender XDR API).
+  const env = process.env;
+  if (!saved.defender && env.SENTINEL_TENANT_ID && env.SENTINEL_CLIENT_ID && env.SENTINEL_CLIENT_SECRET) {
+    saved.defender = { tenantId: env.SENTINEL_TENANT_ID, clientId: env.SENTINEL_CLIENT_ID, clientSecret: env.SENTINEL_CLIENT_SECRET };
   }
-
-  const saved = settings.connectors || {};
   const manager = getConnectorManager();
   for (const def of CONNECTORS) {
     if (isConfigured(def, saved[def.id])) {

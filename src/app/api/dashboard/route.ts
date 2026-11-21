@@ -5,6 +5,7 @@ import edrDataService from "@/lib/edr-data-service";
 import { getSettings } from "@/lib/settings-store";
 import { startSavedConnectors } from "@/lib/connectors/runtime";
 import type { SecurityAlert } from "@/types/alerts";
+import { integrationOf } from "@/lib/connectors/integration-of";
 
 const BUCKETS = ["edr", "email", "network", "web", "cloud"] as const;
 const SEVERITIES = ["Critical", "High", "Medium", "Low"] as const;
@@ -82,6 +83,24 @@ export async function GET(request: NextRequest) {
     }
     const departments = [...deptMap.values()].sort((a, b) => b.costImpact - a.costImpact || b.alerts - a.alerts);
 
+    // Which integration each alert came from, so every source is visible on the dashboard
+    const sourceMap = new Map<string, { source: string; alerts: number; incidents: number; lossAvoided: number }>();
+    const sourceRow = (name: string) => {
+      let row = sourceMap.get(name);
+      if (!row) sourceMap.set(name, (row = { source: name, alerts: 0, incidents: 0, lossAvoided: 0 }));
+      return row;
+    };
+    for (const alert of all) sourceRow(integrationOf(alert.id)).alerts++;
+    for (const incident of risk.incidents) {
+      if (incident.weight <= 0) continue;
+      const row = sourceRow(integrationOf(incident.id.replace(/^(inc|alert):/, "")));
+      row.incidents++;
+      row.lossAvoided += incident.expectedLossAvoided;
+    }
+    const sources = [...sourceMap.values()]
+      .map((r) => ({ ...r, lossAvoided: Math.round(r.lossAvoided) }))
+      .sort((a, b) => b.lossAvoided - a.lossAvoided || b.alerts - a.alerts);
+
     // Loss avoided and alert volume for the last four quarters
     const trend = trailingQuarters(quarter).map((q) => {
       const data = edrDataService.getTimeframeAlerts(q);
@@ -103,6 +122,7 @@ export async function GET(request: NextRequest) {
       categories,
       severityCounts,
       departments,
+      sources,
       trend,
       timestamp: new Date().toISOString(),
     });

@@ -17,7 +17,7 @@ export interface DepartmentInfo {
   deviceName?: string;
 }
 
-const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
+const GRAPH_BASE = process.env.SF_GRAPH_URL || "https://graph.microsoft.com/v1.0";
 
 export class DepartmentResolver {
   private tokenFn: () => Promise<string>;
