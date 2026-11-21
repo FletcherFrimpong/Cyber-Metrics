@@ -23,7 +23,7 @@ const MAX_PAGES = 20;
 // Falcon product that raised the alert → our category.
 const PRODUCT_CATEGORY: Record<string, AlertCategory> = {
   cwpp: "cloud",
-  idp: "cloud",
+  idp: "identity",
   "data-protection": "cloud",
 };
 

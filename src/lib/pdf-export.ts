@@ -8,6 +8,7 @@ export interface TrendsAnalyticsData {
     network: any[];
     web: any[];
     cloud: any[];
+    identity?: any[];
   };
   roiValue: number;
   /** Risk-model output for the period. The report prints money figures only from here. */
@@ -100,6 +101,7 @@ const CATEGORY_NAMES: Record<string, string> = {
   network: "Network",
   web: "Web",
   cloud: "Cloud",
+  identity: "Identity",
 };
 
 const esc = (v: unknown): string =>

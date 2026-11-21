@@ -27,8 +27,8 @@ const SERVICE_CATEGORY: Record<string, AlertCategory> = {
   microsoftdefenderforoffice365: "email",
   microsoftdefenderforcloudapps: "cloud",
   microsoftdefenderforcloud: "cloud",
-  microsoftdefenderforidentity: "cloud",
-  azureadidentityprotection: "cloud",
+  microsoftdefenderforidentity: "identity",
+  azureadidentityprotection: "identity",
   microsoftappgovernance: "cloud",
   datalossprevention: "cloud",
 };

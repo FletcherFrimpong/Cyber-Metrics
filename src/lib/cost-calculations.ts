@@ -10,6 +10,7 @@ import {
 } from "./risk-model";
 import { getRevenueBand, DEFAULT_REVENUE_BAND, type RevenueBand } from "./anchor-data.ts";
 import { getSettings } from "./settings-store";
+import { ALERT_CATEGORIES } from "./connectors/types";
 
 // Centralized cost calculation system.
 // Flow: alerts (Sentinel or sample) → incidents → risk model → dashboard metrics.
@@ -355,7 +356,7 @@ const searchThreatActors = (techniques: string[]): ThreatActorInfo[] => {
 
 const isKnownTechnique = (id: string): boolean => !!MITRE_ATTACK_TECHNIQUES[id]?.isValidTechnique;
 
-const BUCKETS = ["edr", "email", "network", "web", "cloud"] as const;
+const BUCKETS = ALERT_CATEGORIES;
 
 function tag(data: CategorizedAlerts): ModelAlert[] {
   return BUCKETS.flatMap(bucket => (data[bucket] || []).map(alert => ({ alert, bucket })));

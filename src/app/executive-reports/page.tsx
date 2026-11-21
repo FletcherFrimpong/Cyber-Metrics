@@ -148,6 +148,7 @@ export default function ExecutiveReportsPage(props: { selectedQuarter?: string; 
     network: { label: "Network", color: "text-neutral-900" },
     web: { label: "Web", color: "text-neutral-900" },
     cloud: { label: "Cloud", color: "text-neutral-900" },
+    identity: { label: "Identity", color: "text-neutral-900" },
   };
   const savingsBreakdown = m ? m.categoryBreakdown.map(c => ({
     label: `${CATEGORY_STYLE[c.category]?.label || c.category} · ${c.incidents} incident${c.incidents === 1 ? "" : "s"}`,

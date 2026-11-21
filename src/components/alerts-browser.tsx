@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Panel, Tag, th, td } from "@/components/ui/panel";
 import { Input } from "@/components/ui/input";
+import { CATEGORY_LABELS, type AlertCategory } from "@/lib/connectors/types";
 import { Bell, Loader2, Plug, ExternalLink } from "lucide-react";
 
 interface AlertRow {
@@ -11,7 +12,7 @@ interface AlertRow {
   title: string;
   integration: string;
   source: string;
-  category: "edr" | "email" | "network" | "web" | "cloud";
+  category: AlertCategory;
   severity: "Critical" | "High" | "Medium" | "Low";
   verdict: "confirmed" | "dismissed" | "unverified";
   tactic: string;
@@ -31,13 +32,6 @@ interface AlertsResponse {
   alerts: AlertRow[];
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  edr: "Endpoint (EDR)",
-  email: "Email Security",
-  network: "Network",
-  web: "Web Filtering",
-  cloud: "Cloud Security",
-};
 const SEVERITY_TONE = { Critical: "red", High: "orange", Medium: "yellow", Low: "neutral" } as const;
 const VERDICT = {
   confirmed: { label: "Confirmed", tone: "green" },

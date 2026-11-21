@@ -5,8 +5,9 @@ import { startSavedConnectors } from "@/lib/connectors/runtime";
 import { integrationOf } from "@/lib/connectors/integration-of";
 import { verdictFor, stageForTactic } from "@/lib/risk-model";
 import type { SecurityAlert } from "@/types/alerts";
+import { ALERT_CATEGORIES } from "@/lib/connectors/types";
 
-const BUCKETS = ["edr", "email", "network", "web", "cloud"] as const;
+const BUCKETS = ALERT_CATEGORIES;
 const DEFAULT_LIMIT = 500;
 const MAX_LIMIT = 2000;
 

@@ -4,7 +4,23 @@
 
 import type { SecurityAlert } from "../../types/alerts";
 
-export type AlertCategory = "edr" | "email" | "network" | "web" | "cloud";
+/** The six alert categories, in display order. The single list everything else derives from. */
+export const ALERT_CATEGORIES = ["edr", "email", "network", "web", "cloud", "identity"] as const;
+export type AlertCategory = (typeof ALERT_CATEGORIES)[number];
+
+export const CATEGORY_LABELS: Record<AlertCategory, string> = {
+  edr: "Endpoint (EDR)",
+  email: "Email Security",
+  network: "Network",
+  web: "Web Filtering",
+  cloud: "Cloud Security",
+  identity: "Identity",
+};
+
+/** An empty { edr: [], email: [], ... } record. */
+export function emptyByCategory<T>(): Record<AlertCategory, T[]> {
+  return Object.fromEntries(ALERT_CATEGORIES.map((c) => [c, [] as T[]])) as Record<AlertCategory, T[]>;
+}
 
 export type ConnectorConfig = Record<string, string>;
 

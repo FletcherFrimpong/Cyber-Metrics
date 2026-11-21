@@ -27,7 +27,7 @@ Dashboard (ROI, net benefit, category breakdown, trends)
 
 ## Alert Categories
 
-SignalFoundry maps alerts from 80+ security products into 5 categories:
+SignalFoundry sorts alerts into 6 categories:
 
 | Category | Example Products |
 |----------|-----------------|
@@ -36,6 +36,7 @@ SignalFoundry maps alerts from 80+ security products into 5 categories:
 | **Network** | Azure Firewall, Palo Alto, Fortinet, Cisco, Darktrace |
 | **Web** | Azure WAF, Cloudflare, Akamai, Imperva, F5 |
 | **Cloud** | Defender for Cloud, AWS GuardDuty, Prisma Cloud, Wiz, Orca |
+| **Identity** | Entra ID Protection, Defender for Identity, Okta, Active Directory |
 
 ## Data Sources
 
@@ -62,7 +63,7 @@ Things to know:
 
 **Seeing the data arrive.** The **Alerts** screen lists every alert behind the dashboard with its integration, category, severity, analyst verdict, MITRE tactic and department, and counts alerts per integration. **Trends & analytics** has a Data sources table showing alerts, counted incidents and loss avoided per integration.
 
-**Categories.** Every alert is sorted into Endpoint, Email, Network, Web or Cloud (identity alerts count as Cloud). Each connector uses the most specific evidence it has first: the product or log source that raised the alert, then the alert title, then the incident title (`src/lib/connectors/product-category.ts`).
+**Categories.** Every alert is sorted into Endpoint, Email, Network, Web, Cloud or Identity. Identity covers sign-in and directory alerts (Entra ID Protection, Defender for Identity, Okta, Active Directory, CrowdStrike identity protection); cloud control-plane alerts such as AWS IAM changes stay under Cloud. Each connector uses the most specific evidence it has first: the product or log source that raised the alert, then the alert title, then the incident title (`src/lib/connectors/product-category.ts`).
 
 **Other clouds.** For Microsoft sovereign clouds set `SF_MS_LOGIN_URL`, `SF_GRAPH_URL` and `SF_ARM_URL` (for example `https://login.microsoftonline.us`, `https://graph.microsoft.us/v1.0`, `https://management.usgovcloudapi.net`). `SF_CROWDSTRIKE_URL` overrides the CrowdStrike API host.
 

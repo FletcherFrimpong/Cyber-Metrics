@@ -8,16 +8,14 @@ import { getAlertStore, type AlertStore } from "./alert-store";
 
 export type { CategorizedAlerts } from "@/types/alerts";
 
-type AlertCategory = "edr" | "email" | "network" | "web" | "cloud";
+import { ALERT_CATEGORIES, emptyByCategory, type AlertCategory } from "./connectors/types";
 
 class EDRDataService {
   // True once a data source (connector) has been configured
   private realSourceConnected = false;
 
   // Sentinel alert store — ingested alerts keyed by category
-  private sentinelAlerts: Record<AlertCategory, SecurityAlert[]> = {
-    edr: [], email: [], network: [], web: [], cloud: [],
-  };
+  private sentinelAlerts: Record<AlertCategory, SecurityAlert[]> = emptyByCategory<SecurityAlert>();
   private sentinelAlertCount = 0;
   private lastIngestTime: string | null = null;
 
@@ -115,6 +113,7 @@ class EDRDataService {
           else if (cat.includes("network") || cat.includes("firewall") || cat.includes("lateral")) category = "network";
           else if (cat.includes("web") || cat.includes("waf") || cat.includes("injection")) category = "web";
           else if (cat.includes("cloud") || cat.includes("azure") || cat.includes("aws")) category = "cloud";
+          else if (cat.includes("credential") || cat.includes("identity") || cat.includes("account")) category = "identity";
 
           this.sentinelAlerts[category].push(alert as SecurityAlert);
         }
@@ -133,7 +132,7 @@ class EDRDataService {
   // Clears sample data when real data source connects
   private clearSampleData(): void {
     if (!this.usingSampleData) return;
-    this.sentinelAlerts = { edr: [], email: [], network: [], web: [], cloud: [] };
+    this.sentinelAlerts = emptyByCategory<SecurityAlert>();
     this.sentinelAlertCount = 0;
     this.usingSampleData = false;
     this.cache.clear();
@@ -209,7 +208,7 @@ class EDRDataService {
       }
     }
 
-    return { edr: [], email: [], network: [], web: [], cloud: [] };
+    return emptyByCategory<SecurityAlert>();
   }
 
   // Filter Sentinel alerts by timeframe
@@ -224,13 +223,9 @@ class EDRDataService {
         return t >= start && t <= end;
       });
 
-    return {
-      edr: filter(this.sentinelAlerts.edr),
-      email: filter(this.sentinelAlerts.email),
-      network: filter(this.sentinelAlerts.network),
-      web: filter(this.sentinelAlerts.web),
-      cloud: filter(this.sentinelAlerts.cloud),
-    };
+    const out = emptyByCategory<SecurityAlert>();
+    for (const c of ALERT_CATEGORIES) out[c] = filter(this.sentinelAlerts[c]);
+    return out;
   }
 
   // ─── FLAT ALERT ACCESS (for backward compat with EDRQueryParams) ───────────
@@ -272,7 +267,7 @@ class EDRDataService {
 
   getDepartmentBreakdown(timeframe: string): { name: string; alerts: number; costImpact: number; critical: number; high: number }[] {
     const data = this.getTimeframeAlerts(timeframe);
-    const allAlerts = [...data.edr, ...data.email, ...data.network, ...data.web, ...data.cloud];
+    const allAlerts = ALERT_CATEGORIES.flatMap(c => data[c]);
 
     const deptMap = new Map<string, { alerts: number; costImpact: number; critical: number; high: number }>();
 

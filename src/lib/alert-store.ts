@@ -9,7 +9,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { SecurityAlert } from "../types/alerts";
 
-export type StoredCategory = "edr" | "email" | "network" | "web" | "cloud";
+export type StoredCategory = "edr" | "email" | "network" | "web" | "cloud" | "identity";
 
 export interface StoredAlert {
   category: StoredCategory;

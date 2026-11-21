@@ -47,7 +47,8 @@ function categoryOf(src: any): AlertCategory {
   const tags: string[] = [].concat(field(src, "kibana.alert.rule.tags") || []).map(String);
   const text = tags.join(" ").toLowerCase();
   if (/domain:\s*endpoint/.test(text)) return "edr";
-  if (/domain:\s*(cloud|identity|saas)/.test(text)) return "cloud";
+  if (/domain:\s*identity/.test(text)) return "identity";
+  if (/domain:\s*(cloud|saas)/.test(text)) return "cloud";
   if (/domain:\s*network/.test(text)) return "network";
   if (/domain:\s*email/.test(text)) return "email";
   if (/domain:\s*web/.test(text)) return "web";

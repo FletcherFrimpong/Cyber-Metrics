@@ -32,6 +32,7 @@ export interface CategorizedAlerts {
   network: SecurityAlert[];
   web: SecurityAlert[];
   cloud: SecurityAlert[];
+  identity: SecurityAlert[];
 }
 
 export interface EDRQueryParams {

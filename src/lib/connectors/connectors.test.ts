@@ -239,7 +239,7 @@ test("Splunk: dispositions and categories cover every documented value", () => {
   assert.equal(splunkClassification({ disposition_label: "Undetermined" }), "unknown");
   assert.equal(splunkClassification({}), "unknown");
   assert.equal(splunkCategory({ security_domain: "network" }), "network");
-  assert.equal(splunkCategory({ security_domain: "access" }), "cloud");
+  assert.equal(splunkCategory({ security_domain: "access" }), "identity");
   assert.equal(splunkCategory({ security_domain: "threat", rule_name: "Email - Phishing Link Clicked - Rule" }), "email");
   assert.equal(splunkCategory({ security_domain: "threat", rule_name: "Web - SQL Injection Attempt - Rule" }), "web");
   assert.equal(splunkCategory({ security_domain: "threat", rule_name: "AWS IAM Privilege Escalation" }), "cloud");
@@ -688,7 +688,7 @@ test("Elastic: sends ApiKey and kbn-xsrf headers, honours the space, and pages u
 
 // ─── Category sorting ────────────────────────────────────────────────────────
 
-test("alerts are sorted into the five categories from product names and titles", () => {
+test("alerts are sorted into the six categories from product names and titles", () => {
   const cases: [string, string | null][] = [
     // products
     ["Microsoft Defender for Endpoint", "edr"],
@@ -704,15 +704,22 @@ test("alerts are sorted into the five categories from product names and titles",
     ["Blue Coat Web Security Service", "web"],
     ["Microsoft Defender for Cloud", "cloud"],
     ["Amazon AWS CloudTrail", "cloud"],
-    ["Okta Identity Management", "cloud"],
-    ["Microsoft Entra ID Protection", "cloud"],
+    ["Okta Identity Management", "identity"],
+    ["Microsoft Entra ID Protection", "identity"],
+    ["Microsoft Defender for Identity", "identity"],
+    ["Microsoft Windows Active Directory", "identity"],
     ["Microsoft Windows Security Event Log", "edr"],
     // titles
     ["Email messages containing malicious URL removed after delivery", "email"],
     ["Suspicious inbox rule created", "email"],
     ["SQL injection attempt against customer portal", "web"],
-    ["Impossible travel activity", "cloud"],
-    ["Brute force then successful sign-in", "cloud"],
+    ["Impossible travel activity", "identity"],
+    ["Password spray against multiple accounts", "identity"],
+    ["MFA fatigue: repeated push denials", "identity"],
+    ["Kerberoasting activity detected", "identity"],
+    ["Storage account key exported", "cloud"],
+    ["Kubernetes pod with privileged container", "cloud"],
+    ["Brute force then successful sign-in", "identity"],
     ["Ransomware behaviour on FILESRV-02", "edr"],
     ["Port scan from internal host", "network"],
     ["Lateral movement via SMB", "network"],
@@ -732,14 +739,16 @@ test("connectors categorise from the most specific evidence they have", () => {
   assert.equal(splunkCategory({ security_domain: "network", rule_name: "Network - Unusual Outbound Volume - Rule" }), "network");
   assert.equal(splunkCategory({ security_domain: "threat", rule_name: "Threat - Phishing Link Clicked - Rule" }), "email");
   assert.equal(splunkCategory({ security_domain: "network", rule_name: "Network - Web Proxy Blocked Category - Rule" }), "web");
-  assert.equal(splunkCategory({ security_domain: "identity", rule_name: "Identity - Activity from Expired Account - Rule" }), "cloud");
+  assert.equal(splunkCategory({ security_domain: "identity", rule_name: "Identity - Activity from Expired Account - Rule" }), "identity");
+  assert.equal(splunkCategory({ security_domain: "access", rule_name: "Access - AWS IAM Privilege Escalation - Rule" }), "cloud"); // cloud control plane, not a user sign-in
+  assert.equal(splunkCategory({ security_domain: "audit", rule_name: "Audit - Expected Host Not Reporting - Rule" }), "cloud");
   assert.equal(splunkCategory({ security_domain: "threat", rule_name: "Threat - Watchlisted Event Observed - Rule" }), "edr");
   // Sentinel: analytics-rule alerts all say "Azure Sentinel", so the titles decide
   const sentinel = (product: string, alertTitle: string, incidentTitle = "x") =>
     mapSentinelIncident({ ...armIncident, properties: { ...armIncident.properties, title: incidentTitle } }, [{ properties: { ...armAlert.properties, productName: product, alertDisplayName: alertTitle } }])[0].category;
   assert.equal(sentinel("Azure Sentinel", "Malicious inbox rule and phishing campaign"), "email");
   assert.equal(sentinel("Azure Sentinel", "Rare process on endpoint with PowerShell"), "edr");
-  assert.equal(sentinel("Azure Sentinel", "Anomalous sign-in from unfamiliar location"), "cloud");
+  assert.equal(sentinel("Azure Sentinel", "Anomalous sign-in from unfamiliar location"), "identity");
   assert.equal(sentinel("Microsoft Defender for Endpoint", "Suspicious activity"), "edr");
   assert.equal(sentinel("Azure Sentinel", "Unclassifiable", "Unclassifiable"), "cloud"); // documented fallback
   // QRadar: log source type first, then categories and description; falls back to network
@@ -754,9 +763,20 @@ test("connectors categorise from the most specific evidence they have", () => {
   assert.equal(cx({ incident_sources: ["XDR Agent"], description: "Phishing payload executed" }), "edr");
   assert.equal(cx({ incident_sources: ["PAN NGFW"] }), "network");
   assert.equal(cx({ incident_sources: ["Prisma Cloud"] }), "cloud");
-  assert.equal(cx({ incident_sources: ["Correlation"], description: "Impossible travel for user" }), "cloud");
+  assert.equal(cx({ incident_sources: ["Correlation"], description: "Impossible travel for user" }), "identity");
   assert.equal(cx({ incident_sources: ["Correlation"] }), "edr");
 });
+
+test("identity alerts get their own category from each vendor's own signal", () => {
+  const dAlert = (serviceSource: string) => mapDefenderIncident({ ...defenderIncident, alerts: [{ ...defenderIncident.alerts[0], serviceSource }] })[0].category;
+  assert.equal(dAlert("microsoftDefenderForIdentity"), "identity");
+  assert.equal(dAlert("azureAdIdentityProtection"), "identity");
+  assert.equal(dAlert("microsoftDefenderForCloudApps"), "cloud");
+  assert.equal(mapCrowdStrikeAlert({ ...csAlert, product: "idp" }).category, "identity");
+  assert.equal(mapElasticAlert({ _id: "i1", _source: { ...elasticHit._source, "kibana.alert.rule.tags": ["Domain: Identity"] } }).category, "identity");
+  assert.equal(q0({ log_sources: [{ type_name: "Okta Identity Management", name: "okta" }] }), "identity");
+});
+const q0 = (o: any) => mapQRadarOffense({ ...offense, log_sources: [], categories: [], description: "x", ...o }).category;
 
 // ─── Registry ───────────────────────────────────────────────────────────────
 

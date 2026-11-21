@@ -61,7 +61,8 @@ export function splunkCategory(notable: any): AlertCategory {
   if (subject === "email" || subject === "web") return subject;
   if (domain === "endpoint") return "edr";
   if (domain === "network") return "network";
-  if (domain === "access" || domain === "identity" || domain === "audit") return "cloud";
+  if (domain === "access" || domain === "identity") return subject === "cloud" ? "cloud" : "identity";
+  if (domain === "audit") return "cloud";
   return subject ?? "edr";
 }
 

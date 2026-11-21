@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Shield, AlertTriangle, Activity, DollarSign, Calendar, TrendingUp, Plug } from "lucide-react";
 import { Panel, Tag, th, td } from "@/components/ui/panel";
+import { CATEGORY_LABELS, emptyByCategory, type AlertCategory } from "@/lib/connectors/types";
 import { useDashboardData, type DashboardMetrics } from "@/hooks/useDashboardData";
 import type { TrendsAnalyticsData } from "@/lib/pdf-export";
 
@@ -13,15 +14,7 @@ interface TrendsAnalyticsProps {
 }
 
 type SeverityLevel = "Critical" | "High" | "Medium" | "Low";
-type CategoryKey = "edr" | "email" | "network" | "web" | "cloud";
-
-const CATEGORY_LABELS: Record<CategoryKey, string> = {
-  edr: "Endpoint (EDR)",
-  email: "Email Security",
-  network: "Network",
-  web: "Web Filtering",
-  cloud: "Cloud Security",
-};
+type CategoryKey = AlertCategory;
 
 const SEVERITY_CONFIG: Record<SeverityLevel, { color: string; bg: string; bar: string }> = {
   Critical: { color: "text-red-400", bg: "bg-red-500/10", bar: "bg-red-500" },
@@ -68,7 +61,7 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
 
   // Per-category severity rows for the PDF, rebuilt from the server's counts
   const timeframeAlerts = useMemo(() => {
-    const out = { edr: [] as any[], email: [] as any[], network: [] as any[], web: [] as any[], cloud: [] as any[] };
+    const out = emptyByCategory<any>();
     for (const c of data?.categories ?? []) {
       for (const [sev, n] of [["Critical", c.critical], ["High", c.high], ["Medium", c.medium], ["Low", c.low]] as const) {
         for (let i = 0; i < n; i++) out[c.key].push({ severity: sev });
@@ -86,7 +79,7 @@ export default function TrendsAnalytics({ timeView, selectedQuarter }: TrendsAna
       { label: "Risk Quantified", value: costMetrics.totalCostImpact >= 1000000 ? Math.round(costMetrics.totalCostImpact / 1000000 * 10) / 10 : Math.round(costMetrics.totalCostImpact / 1000), unit: costMetrics.totalCostImpact >= 1000000 ? "M" : "K", good: true },
       { label: "ROI", value: costMetrics.roi, unit: "%", good: costMetrics.roi > 0 },
       { label: "Investment", value: costMetrics.totalInvestment / 1000, unit: "K", good: true },
-      { label: "Coverage", value: categoryCounts.filter(c => c.count > 0).length, unit: "/5", good: true },
+      { label: "Coverage", value: categoryCounts.filter(c => c.count > 0).length, unit: `/${categoryCounts.length}`, good: true },
     ];
   }, [totalAlerts, costMetrics, categoryCounts]);
 

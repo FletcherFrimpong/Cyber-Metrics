@@ -5,9 +5,10 @@ import edrDataService from "@/lib/edr-data-service";
 import { getSettings } from "@/lib/settings-store";
 import { startSavedConnectors } from "@/lib/connectors/runtime";
 import type { SecurityAlert } from "@/types/alerts";
+import { ALERT_CATEGORIES, emptyByCategory } from "@/lib/connectors/types";
 import { integrationOf } from "@/lib/connectors/integration-of";
 
-const BUCKETS = ["edr", "email", "network", "web", "cloud"] as const;
+const BUCKETS = ALERT_CATEGORIES;
 const SEVERITIES = ["Critical", "High", "Medium", "Low"] as const;
 
 function quartersOf(period: "quarterly" | "yearly", quarter: string): string[] {
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
     const risk = calculateRiskSummary({ period, selectedQuarter: quarter });
 
     // Alert counts for the period, by category and severity
-    const byBucket: Record<string, SecurityAlert[]> = { edr: [], email: [], network: [], web: [], cloud: [] };
+    const byBucket = emptyByCategory<SecurityAlert>();
     for (const q of quartersOf(period, quarter)) {
       const data = edrDataService.getTimeframeAlerts(q);
       for (const b of BUCKETS) byBucket[b].push(...data[b]);

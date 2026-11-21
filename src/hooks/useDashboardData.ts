@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { AlertCategory } from "@/lib/connectors/types";
 
 export interface DashboardCategory {
-  key: "edr" | "email" | "network" | "web" | "cloud";
+  key: AlertCategory;
   count: number;
   critical: number;
   high: number;

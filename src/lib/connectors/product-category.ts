@@ -1,11 +1,12 @@
-// Sorts an alert into one of our five categories from text about it: the name
+// Sorts an alert into one of our six categories from text about it: the name
 // of the product or log source that raised it, the rule or alert title, tags.
 // Used by every connector whose source aggregates many tools.
 //
 // Rules are tried in order and the first match wins, so the order is deliberate:
 //   email  before everything (a phishing alert from a cloud mail product is email)
 //   web    before network    (a WAF is a web control, not a firewall)
-//   cloud  before endpoint   (identity and SaaS alerts often mention a device)
+//   identity before cloud    (a sign-in alert from a cloud directory is identity)
+//   cloud  before endpoint   (SaaS and cloud alerts often mention a device)
 //   endpoint before network  (malware alerts often mention a connection)
 // Whole words are matched, so "ips" does not fire on "tips".
 
@@ -21,8 +22,12 @@ const RULES: [AlertCategory, RegExp][] = [
     /web application firewall|\bwaf\b|cloudflare|akamai|imperva|incapsula|f5 (asm|waf|advanced waf)|big-?ip asm|application gateway|bot (protection|manager)|zscaler|web (proxy|gateway|filter(ing)?|attack|shell)|\bwebshell\b|\bproxy\b|proxysg|blue ?coat|\bsquid\b|url filter|sql injection|\bsqli\b|\bxss\b|cross[- ]site|http flood|directory traversal|path traversal/,
   ],
   [
+    "identity",
+    /defender for identity|azure ad\b|azure active directory|\bentra\b|identity protection|\bokta\b|\bduo\b|ping identity|onelogin|cyberark|active directory|domain controller|\bkerbero|\bldap\b|impossible travel|\bmfa\b|multi-?factor|conditional access|service principal|oauth app|consent grant|sign-?ins?\b|\blog-?ins?\b|logon|brute[- ]force|password spray|credential stuffing|account (takeover|compromise|lockout)|privileged (account|identity|role)|\bidentity\b/,
+  ],
+  [
     "cloud",
-    /defender for (cloud|resource manager|storage|key vault|dns|sql|cosmos|containers|servers|identity|app service)|cloud apps|\bmcas\b|azure ad\b|azure active directory|\bentra\b|identity protection|\baws\b|amazon web services|guardduty|security hub|cloudtrail|\bgcp\b|google (cloud|workspace|security command)|prisma cloud|lacework|\bwiz\b|orca security|kubernetes|\bk8s\b|\bs3 bucket|\biam\b|\bokta\b|\bduo\b|ping identity|onelogin|active directory|\bsaas\b|salesforce|\bo365\b|office ?365|sharepoint|onedrive|azure (activity|resource|key vault|storage|subscription)|impossible travel|\bmfa\b|multi-?factor|conditional access|service principal|oauth app|consent grant|sign-?ins?\b|cloud security|cloud workload/,
+    /defender for (cloud|resource manager|storage|key vault|dns|sql|cosmos|containers|servers|app service)|cloud apps|\bmcas\b|\baws\b|amazon web services|guardduty|security hub|cloudtrail|\bgcp\b|google (cloud|workspace|security command)|prisma cloud|lacework|\bwiz\b|orca security|kubernetes|\bk8s\b|\bs3 bucket|\biam\b|\bsaas\b|salesforce|\bo365\b|office ?365|sharepoint|onedrive|azure (activity|resource|key vault|storage|subscription)|storage account|key vault|cloud security|cloud workload/,
   ],
   [
     "edr",
